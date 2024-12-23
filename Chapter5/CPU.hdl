@@ -1,0 +1,99 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/5/CPU.hdl
+/**
+ * The Hack Central Processing unit (CPU).
+ * Parses the binary code in the instruction input and executes it according to the
+ * Hack machine language specification. In the case of a C-instruction, computes the
+ * function specified by the instruction. If the instruction specifies to read a memory
+ * value, the inM input is expected to contain this value. If the instruction specifies
+ * to write a value to the memory, sets the outM output to this value, sets the addressM
+ * output to the target address, and asserts the writeM output (when writeM = 0, any
+ * value may appear in outM).
+ * If the reset input is 0, computes the address of the next instruction and sets the
+ * pc output to that value. If the reset input is 1, sets pc to 0.
+ * Note: The outM and writeM outputs are combinational: they are affected by the
+ * instruction's execution during the current cycle. The addressM and pc outputs are
+ * clocked: although they are affected by the instruction's execution, they commit to
+ * their new values only in the next cycle.
+ */
+CHIP CPU {
+
+    IN  inM[16],         // M value input  (M = contents of RAM[A])
+        instruction[16], // Instruction for execution
+        reset;           // Signals whether to re-start the current
+                         // program (reset==1) or continue executing
+                         // the current program (reset==0).
+
+    OUT outM[16],        // M value output
+        writeM,          // Write to M? 
+        addressM[15],    // Address in data memory (of M)
+        pc[15];          // address of next instruction
+
+    PARTS:
+
+    // 命令のデコード
+    // C命令かA命令かは先頭ビットを見ればいいだけ
+    //A命令のアドレスをゲット
+    Not16(in=instruction , out=Aaddress1);
+    Not16(in=Aaddress1 , out[0..14]=Aaddress);
+
+    //C命令の各部分をゲット
+    Not16(in=instruction , out=Caddress1);
+    Not16(in=Caddress1 , out[12]=Acomp, out[11]=Ccomp1, out[10]=Ccomp2, out[9]=Ccomp3, out[8]=Ccomp4, out[7]=Ccomp5, out[6]=Ccomp6, out[5]=dest1, out[4]=dest2, out[3]=dest3, out[0..2]=jump);
+
+	//  アドレス命令の時はinstructionで計算命令の時は前回のALUの結果
+    Mux16(a=instruction , b=out14 , sel=instruction[15] , out=out1);
+
+    Not(in=instruction[15] , out=load1);
+    Mux(a=dest1 , b=load1 , sel=load1 , out=load2);
+    ARegister(in=out1 , load=load2 , out=out2, out[0..14]=addressM);
+    Mux16(a=out2 , b=inM , sel=Acomp , out=out3 );
+
+    //Dレジスタの処理
+    Mux(a=false , b=dest2 , sel=instruction[15] , out=Dload );
+    DRegister(in=out14 , load=Dload , out=out4);
+
+    // 今は、C命令しか対応していない
+    Mux(a=false , b=Ccomp1 , sel=instruction[15] , out= comp1);
+    Mux(a=false , b=Ccomp2 , sel=instruction[15] , out= comp2);
+    Mux(a=true , b=Ccomp3 , sel=instruction[15] , out= comp3);
+    Mux(a=false , b=Ccomp4 , sel=instruction[15] , out= comp4);
+    Mux(a=false , b=Ccomp5 , sel=instruction[15] , out= comp5);
+    Mux(a=true , b=Ccomp6 , sel=instruction[15] , out= comp6);
+    ALU(x=out4, y=out3 , zx=comp1 , nx=comp2 , zy=comp3 , ny=comp4 , f=comp5 , no=comp6 , out=out14, out=outM , zr=zr1 , ng=ng1 );
+
+
+    // writeM
+    Mux(a=false , b=true , sel=dest3 , out=writeM1 );
+    Mux(a=false , b=writeM1 , sel=instruction[15] , out=writeM );
+
+    Not(in=ng1 , out=ps1); // 以上
+    Not(in=zr1 , out=nz1); // 0ではない
+    And(a=ps1 , b=nz1 , out=ps2 ); //より大きい
+    Not(in=ps2 , out=ng2 ); //より大きい
+
+    //c命令の時のやつ
+    DMux8Way(in=true , sel=jump , a=a , b=b , c=c , d=d , e=e , f=f , g=g , h=h );
+    Mux(a=false , b=false , sel=a , out=pcLoad1);
+    Mux(a=pcLoad1 , b=ps2 , sel=b , out=pcLoad2 );
+    Mux(a=pcLoad2 , b=zr1 , sel=c , out=pcLoad3 );
+    Mux(a=pcLoad3 , b=ps1 , sel=d , out=pcLoad4 );
+    Mux(a=pcLoad4 , b=ng1 , sel=e , out=pcLoad5 );
+    Mux(a=pcLoad5 , b=nz1 , sel=f , out=pcLoad6 );
+    Mux(a=pcLoad6 , b=ng2 , sel=g , out=pcLoad7 );
+    Mux(a=pcLoad7 , b=true , sel=h , out=pcLoad8 );
+
+
+    // A命令の時のやつ
+
+    // どっち使う？
+
+    Mux(a=false , b=pcLoad8 , sel=instruction[15] , out=pcLoad9 );
+
+    Not(in=pcLoad9 , out=inc1 );
+    
+
+    PC(in=out2 , load=pcLoad9 , inc=inc1 , reset=reset , out[0..14]=pc );
+}
