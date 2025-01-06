@@ -1,12 +1,11 @@
+/*
+Copyright © 2025 NAME HERE <EMAIL ADDRESS>
+
+*/
 package main
 
-import (
-	"github.com/peta-skr/NAND2Tetris/code"
-	"github.com/peta-skr/NAND2Tetris/parser"
-)
-
+import "github.com/peta-skr/NAND2Tetris/cmd"
 
 func main() {
-	parser.Parser()
-	code.Code()
+	cmd.Execute()
 }
