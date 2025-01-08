@@ -123,9 +123,66 @@ func (i *InputData) Symbol() string {
 	}
 }
 
-func dest(){}
+func (i *InputData) dest() string {
+	if i.commandType != C_COMMAND {
+		return "current CommandType is not C_COMMAND"
+	}
+
+	cmd := i.text[i.index]
+
+	dest, _, found := strings.Cut(cmd, "=")
+
+	if !found {
+		return "null"
+	}
+
+	return dest
+}
 
 
-func comp(){}
+func (i *InputData) comp() string {
+	if i.commandType != C_COMMAND {
+		return "current CommandType is not C_COMMAND"
+	}
 
-func jump(){}
+	cmd := i.text[i.index]
+
+	_, after, found := strings.Cut(cmd, "=")
+
+	if !found {
+		return "some error"
+	}
+
+	var comp string
+
+	if strings.HasSuffix(after, ";") {
+		c, found := strings.CutPrefix(after, ";")
+
+		if !found {
+			return "some error"
+		}
+
+		comp = c
+	}else {
+		comp = after
+	}
+
+	return comp
+
+}
+
+func (i *InputData) jump() string {
+	if i.commandType != C_COMMAND {
+		return "current CommandType is not C_COMMAND"
+	}
+
+	cmd := i.text[i.index]
+
+	jump, found := strings.CutSuffix(cmd, ";")
+
+	if !found {
+		return "some error"
+	}
+
+	return jump
+}
