@@ -20,10 +20,10 @@ const (
 )
 
 type InputData struct {
-	text []string
-	index int
-	length int
-	commandType CommandType
+	Text []string
+	Index int
+	Length int
+	CmdType CommandType
 }
 
 
@@ -41,16 +41,18 @@ func Initialize(filePath string) (inputData InputData, err error) {
 	defer f.Close()
 	
 	inputData = InputData{}
-	inputData.index = -1
+	inputData.Index = -1
 	
 	scanner := bufio.NewScanner(f)
 	length := 0
 	for scanner.Scan() {
 		length++
-		inputData.text = append(inputData.text, scanner.Text())
+		inputData.Text = append(inputData.Text, scanner.Text())
 	}
 	
-	inputData.length = length
+	inputData.Length = length
+
+	fmt.Println(inputData)
 
 	return inputData, nil
 }
@@ -59,7 +61,7 @@ func Initialize(filePath string) (inputData InputData, err error) {
 次のコマンドがあるかチェック
 */
 func (i *InputData) HasMoreCommands() bool {
-	return i.length > i.index + 1
+	return i.Length > i.Index + 1
 }
 
 /*
@@ -71,27 +73,27 @@ func (i *InputData) Advance(){
 		return
 	}
 
-	i.index++
+	i.Index++
 
-	// ここで次のコマンドを変換する
-	cmd := i.text[i.index]
+	cmd := i.Text[i.Index]
 
 	if strings.HasPrefix(cmd, "@") {
-		i.commandType = A_COMMAND
+		i.CmdType = A_COMMAND
 	} else if strings.HasPrefix(cmd, "(") {
-		i.commandType = L_COMMAND
-	}else {
+		i.CmdType = L_COMMAND
+	}else if !strings.HasPrefix(cmd, "//") {
+		i.CmdType = C_COMMAND
 	}
 
 }
 
 func (i *InputData) CommandType() CommandType {
-	return i.commandType
+	return i.CmdType
 }
 
 func (i *InputData) Symbol() string {
 
-	cmd := i.text[i.index]
+	cmd := i.Text[i.Index]
 
 	switch i.CommandType() {
 	case A_COMMAND:
@@ -123,12 +125,12 @@ func (i *InputData) Symbol() string {
 	}
 }
 
-func (i *InputData) dest() string {
-	if i.commandType != C_COMMAND {
+func (i *InputData) Dest() string {
+	if i.CmdType != C_COMMAND {
 		return "current CommandType is not C_COMMAND"
 	}
 
-	cmd := i.text[i.index]
+	cmd := i.Text[i.Index]
 
 	dest, _, found := strings.Cut(cmd, "=")
 
@@ -140,12 +142,12 @@ func (i *InputData) dest() string {
 }
 
 
-func (i *InputData) comp() string {
-	if i.commandType != C_COMMAND {
+func (i *InputData) Comp() string {
+	if i.CmdType != C_COMMAND {
 		return "current CommandType is not C_COMMAND"
 	}
 
-	cmd := i.text[i.index]
+	cmd := i.Text[i.Index]
 
 	_, after, found := strings.Cut(cmd, "=")
 
@@ -171,12 +173,12 @@ func (i *InputData) comp() string {
 
 }
 
-func (i *InputData) jump() string {
-	if i.commandType != C_COMMAND {
+func (i *InputData) Jump() string {
+	if i.CmdType != C_COMMAND {
 		return "current CommandType is not C_COMMAND"
 	}
 
-	cmd := i.text[i.index]
+	cmd := i.Text[i.Index]
 
 	jump, found := strings.CutSuffix(cmd, ";")
 
