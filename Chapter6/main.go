@@ -81,7 +81,7 @@ func Assemble(filepath string) string {
 	for i := range len(parsedData) {
 		output += parsedData[i]
 		if len(parsedData) - 1 > i {
-			output += "\r\n"
+			output += "\n"
 		}
 	}
 

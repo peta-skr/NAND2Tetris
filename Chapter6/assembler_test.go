@@ -9,9 +9,9 @@ import (
 func TestAssembler(t *testing.T) {
 	t.Run("assembler Add.asm", func(t *testing.T) {
 		got := Assemble("./test/Add.asm")
-		want := fileRead("./test/Add_binary.txt")
+		want := fileRead("./test/compare/Add.hack")
 
-		os.WriteFile("./output/Add_output.txt", []byte(got), os.ModeAppend)
+		// os.WriteFile("./test/output/Add.hack", []byte(got), os.ModeAppend)
 
 		if want != got {
 			t.Errorf("got %q, want %q", got, want)
@@ -20,9 +20,9 @@ func TestAssembler(t *testing.T) {
 
 	t.Run("assembler MaxL.asm", func(t *testing.T) {
 		got := Assemble("./test/MaxL.asm")
-		want := fileRead("./test/MaxL_binary.txt")
+		want := fileRead("./test/compare/MaxL.hack")
 
-		os.WriteFile("./output/MaxL_output.txt", []byte(got), os.ModeAppend)
+		// os.WriteFile("./test/output/MaxL_output.txt", []byte(got), os.ModeAppend)
 
 		if want != got {
 			t.Errorf("got %q, want %q", got, want)
@@ -31,7 +31,7 @@ func TestAssembler(t *testing.T) {
 
 	t.Run("assembler PongL.asm", func(t *testing.T) {
 		got := Assemble("./test/PongL.asm")
-		want := fileRead("./test/PongL_binary.txt")
+		want := fileRead("./test/compare/PongL.hack")
 
 		if want != got {
 			t.Errorf("got %q, want %q", got, want)
@@ -40,9 +40,20 @@ func TestAssembler(t *testing.T) {
 
 	t.Run("assembler RectL.asm", func(t *testing.T) {
 		got := Assemble("./test/RectL.asm")
-		want := fileRead("./test/RectL_binary.txt")
+		want := fileRead("./test/compare/RectL.hack")
 
-		os.WriteFile("./output/RectL_output.txt", []byte(got), os.ModeAppend)
+		// os.WriteFile("./output/RectL.hack", []byte(got), os.ModeAppend)
+
+		if want != got {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+
+	t.Run("assembler Max.asm", func(t *testing.T) {
+		got := Assemble("./test/Max.asm")
+		want := fileRead("./test/compare/Max.hack")
+
+		os.WriteFile("./test/output/Max.hack", []byte(got), os.ModeAppend)
 
 		if want != got {
 			t.Errorf("got %q, want %q", got, want)
