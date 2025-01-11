@@ -40,6 +40,7 @@ func Assemble(filepath string) string {
 	for data.HasMoreCommands() {
 		data.Advance()
 
+
 		switch data.CommandType() {
 		case parser.A_COMMAND:
 			str, found := strings.CutPrefix(data.Text[data.Index], "@")
@@ -72,8 +73,6 @@ func Assemble(filepath string) string {
 
 
 		case parser.L_COMMAND:
-		default:
-			
 		}
 	}
 	
@@ -81,7 +80,7 @@ func Assemble(filepath string) string {
 
 	for i := range len(parsedData) {
 		output += parsedData[i]
-		if len(parsedData) > i {
+		if len(parsedData) - 1 > i {
 			output += "\r\n"
 		}
 	}

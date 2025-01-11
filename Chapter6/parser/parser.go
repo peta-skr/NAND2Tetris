@@ -14,7 +14,8 @@ func Parser() {
 type CommandType int
 
 const (
-	A_COMMAND CommandType = iota
+	IGNORE_COMMAND CommandType = iota
+	A_COMMAND
 	C_COMMAND
 	L_COMMAND
 )
@@ -52,8 +53,6 @@ func Initialize(filePath string) (inputData InputData, err error) {
 	
 	inputData.Length = length
 
-	fmt.Println(inputData)
-
 	return inputData, nil
 }
 
@@ -81,7 +80,7 @@ func (i *InputData) Advance(){
 		i.CmdType = A_COMMAND
 	} else if strings.HasPrefix(cmd, "(") {
 		i.CmdType = L_COMMAND
-	}else if !strings.HasPrefix(cmd, "//") {
+	}else if !strings.HasPrefix(cmd, "//") && cmd != "" {
 		i.CmdType = C_COMMAND
 	}
 
@@ -126,39 +125,48 @@ func (i *InputData) Symbol() string {
 }
 
 func (i *InputData) Dest() string {
-	if i.CmdType != C_COMMAND {
+	if i.CommandType() != C_COMMAND {
 		return "current CommandType is not C_COMMAND"
 	}
 
 	cmd := i.Text[i.Index]
 
-	dest, _, found := strings.Cut(cmd, "=")
+	if strings.Contains(cmd, "=") {
+		dest, _, _ := strings.Cut(cmd, "=")
 
-	if !found {
-		return "null"
+		return strings.Trim(dest, " ")
 	}
 
-	return dest
+	return "null"
+
 }
 
 
 func (i *InputData) Comp() string {
-	if i.CmdType != C_COMMAND {
+	if i.CommandType() != C_COMMAND {
 		return "current CommandType is not C_COMMAND"
 	}
 
 	cmd := i.Text[i.Index]
+	var cutDest string
 
-	_, after, found := strings.Cut(cmd, "=")
+	if strings.Contains(cmd, "=") {
 
-	if !found {
-		return "some error"
+		_, c, found := strings.Cut(cmd, "=")
+
+		if !found {
+			return "some error"
+		}
+		
+		cutDest = c
+	}else {
+		cutDest = cmd
 	}
 
 	var comp string
 
-	if strings.HasSuffix(after, ";") {
-		c, found := strings.CutPrefix(after, ";")
+	if strings.Contains(cutDest, ";") {
+		c, _, found := strings.Cut(cutDest, ";")
 
 		if !found {
 			return "some error"
@@ -166,10 +174,10 @@ func (i *InputData) Comp() string {
 
 		comp = c
 	}else {
-		comp = after
+		comp = cutDest
 	}
 
-	return comp
+	return strings.Trim(comp, " ")
 
 }
 
@@ -180,11 +188,11 @@ func (i *InputData) Jump() string {
 
 	cmd := i.Text[i.Index]
 
-	jump, found := strings.CutSuffix(cmd, ";")
+	_, jump, found := strings.Cut(cmd, ";")
 
 	if !found {
-		return "some error"
+		return "null"
 	}
 
-	return jump
+	return strings.Trim(jump, " ")
 }
