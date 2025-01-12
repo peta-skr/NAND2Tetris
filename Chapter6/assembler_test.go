@@ -59,6 +59,28 @@ func TestAssembler(t *testing.T) {
 			t.Errorf("got %q, want %q", got, want)
 		}
 	})
+
+	t.Run("assembler Rect.asm", func(t *testing.T) {
+		got := Assemble("./test/Rect.asm")
+		want := fileRead("./test/compare/Rect.hack")
+
+		os.WriteFile("./test/output/Rect.hack", []byte(got), os.ModeAppend)
+
+		if want != got {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
+	
+	t.Run("assembler Pong.asm", func(t *testing.T) {
+		got := Assemble("./test/Pong.asm")
+		want := fileRead("./test/compare/Pong.hack")
+
+		os.WriteFile("./test/output/Pong.hack", []byte(got), os.ModeAppend)
+
+		if want != got {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	})
 }
 
 func fileRead(path string) string {

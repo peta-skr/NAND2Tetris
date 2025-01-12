@@ -74,14 +74,16 @@ func (i *InputData) Advance(){
 
 	i.Index++
 
-	cmd := i.Text[i.Index]
+	cmd := strings.Trim(i.Text[i.Index], " ")
 
 	if strings.HasPrefix(cmd, "@") {
 		i.CmdType = A_COMMAND
 	} else if strings.HasPrefix(cmd, "(") {
 		i.CmdType = L_COMMAND
-	}else if !strings.HasPrefix(cmd, "//") && cmd != "" {
+	}else if !strings.HasPrefix(cmd, "//") && len(cmd) > 0 {
 		i.CmdType = C_COMMAND
+	}else {
+		i.CmdType = IGNORE_COMMAND
 	}
 
 }
@@ -92,7 +94,7 @@ func (i *InputData) CommandType() CommandType {
 
 func (i *InputData) Symbol() string {
 
-	cmd := i.Text[i.Index]
+	cmd := strings.Trim(i.Text[i.Index], " ")
 
 	switch i.CommandType() {
 	case A_COMMAND:
@@ -111,7 +113,7 @@ func (i *InputData) Symbol() string {
 			return ""
 		}
 
-		symbol, found := strings.CutSuffix(s, "(")
+		symbol, found := strings.CutSuffix(s, ")")
 		if !found {
 			fmt.Println("fail to  cut `)` from L_COMMAND")
 			return ""
@@ -129,7 +131,7 @@ func (i *InputData) Dest() string {
 		return "current CommandType is not C_COMMAND"
 	}
 
-	cmd := i.Text[i.Index]
+	cmd := strings.Trim(i.Text[i.Index], " ")
 
 	if strings.Contains(cmd, "=") {
 		dest, _, _ := strings.Cut(cmd, "=")

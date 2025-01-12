@@ -10,6 +10,7 @@ import (
 
 	"github.com/peta-skr/NAND2Tetris/code"
 	"github.com/peta-skr/NAND2Tetris/parser"
+	"github.com/peta-skr/NAND2Tetris/symbolTable"
 )
 
 func main() {
@@ -31,6 +32,8 @@ func Assemble(filepath string) string {
 	var err error
 	data, err = parser.Initialize(filepath)
 	var parsedData []string
+	var addressCounter int
+	symbolTable := symbolTable.Initialize()
 
 	if err != nil {
 		fmt.Println(err)
@@ -40,10 +43,43 @@ func Assemble(filepath string) string {
 	for data.HasMoreCommands() {
 		data.Advance()
 
+		switch data.CommandType() {
+		case parser.A_COMMAND:
+			// symbol := data.Symbol()
+			// _, err := strconv.Atoi(symbol)
+
+			// if err != nil {
+			// 	symbolTable.AddEntry(symbol, addressCounter)
+			// }
+
+			addressCounter++
+
+		case parser.C_COMMAND:
+			addressCounter++
+
+		case parser.L_COMMAND:
+			symbol := data.Symbol()
+			symbolTable.AddEntry(symbol, addressCounter)
+
+		}
+	}
+
+	data, err = parser.Initialize(filepath)
+
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+
+	addressCounter = 16
+
+	for data.HasMoreCommands() {
+		data.Advance()
+
 
 		switch data.CommandType() {
 		case parser.A_COMMAND:
-			str, found := strings.CutPrefix(data.Text[data.Index], "@")
+			str, found := strings.CutPrefix(strings.Trim(data.Text[data.Index], " "), "@")
 
 			if !found {
 				fmt.Errorf("some error")
@@ -51,11 +87,21 @@ func Assemble(filepath string) string {
 
 			num, err := strconv.Atoi(str)
 
-			if err != nil {
-				fmt.Errorf("some error")
-			}
+			var binary_str string
 
-			binary_str := strconv.FormatInt(int64(num), 2)
+
+			if err != nil {
+				if symbolTable.Contains(str) {
+					num = symbolTable.GetAddress(str)
+					binary_str = strconv.FormatInt(int64(num), 2)
+				}else {
+					symbolTable.AddEntry(str, addressCounter)
+					binary_str = strconv.FormatInt(int64(addressCounter), 2)
+					addressCounter++
+				}
+			}else {
+				binary_str = strconv.FormatInt(int64(num), 2)
+			}
 
 			//16桁になるまで0を追加する
 			binary_str = fmt.Sprintf("%016s", binary_str)
@@ -71,8 +117,8 @@ func Assemble(filepath string) string {
 
 			parsedData = append(parsedData, binary_str)
 
-
 		case parser.L_COMMAND:
+
 		}
 	}
 	
