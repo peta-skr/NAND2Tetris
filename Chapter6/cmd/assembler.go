@@ -6,7 +6,10 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 
+	"github.com/peta-skr/NAND2Tetris/assemble"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +34,9 @@ Args: func(cmd *cobra.Command, args []string) error {
 
 		fmt.Println("assembler called")
 		fmt.Println(args[0])
-
+		output := assemble.Assemble(args[0])
+		base := args[0][:len(args[0]) - len(filepath.Ext(args[0]))]
+		os.WriteFile(base + ".hack", []byte(output), os.ModeAppend)
 	},
 }
 

@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-func Parser() {
-
-}
-
 type CommandType int
 
 const (
@@ -48,7 +44,7 @@ func Initialize(filePath string) (inputData InputData, err error) {
 	length := 0
 	for scanner.Scan() {
 		length++
-		inputData.Text = append(inputData.Text, scanner.Text())
+		inputData.Text = append(inputData.Text, strings.Trim(scanner.Text(), " "))
 	}
 	
 	inputData.Length = length
@@ -74,7 +70,7 @@ func (i *InputData) Advance(){
 
 	i.Index++
 
-	cmd := strings.Trim(i.Text[i.Index], " ")
+	cmd := i.Text[i.Index]
 
 	if strings.HasPrefix(cmd, "@") {
 		i.CmdType = A_COMMAND
@@ -88,13 +84,16 @@ func (i *InputData) Advance(){
 
 }
 
+/*
+* 現在のコマンドタイプを取得
+*/
 func (i *InputData) CommandType() CommandType {
 	return i.CmdType
 }
 
 func (i *InputData) Symbol() string {
 
-	cmd := strings.Trim(i.Text[i.Index], " ")
+	cmd := i.Text[i.Index]
 
 	switch i.CommandType() {
 	case A_COMMAND:
@@ -106,14 +105,14 @@ func (i *InputData) Symbol() string {
 
 		return symbol
 	case L_COMMAND:
-		s, f := strings.CutPrefix(cmd, "(")
+		cutHead, found := strings.CutPrefix(cmd, "(")
 
-		if !f {
+		if !found {
 			fmt.Println("fail to  cut `(` from L_COMMAND")
 			return ""
 		}
 
-		symbol, found := strings.CutSuffix(s, ")")
+		symbol, found := strings.CutSuffix(cutHead, ")")
 		if !found {
 			fmt.Println("fail to  cut `)` from L_COMMAND")
 			return ""
@@ -131,12 +130,12 @@ func (i *InputData) Dest() string {
 		return "current CommandType is not C_COMMAND"
 	}
 
-	cmd := strings.Trim(i.Text[i.Index], " ")
+	cmd := i.Text[i.Index]
 
 	if strings.Contains(cmd, "=") {
 		dest, _, _ := strings.Cut(cmd, "=")
 
-		return strings.Trim(dest, " ")
+		return dest
 	}
 
 	return "null"
@@ -146,7 +145,8 @@ func (i *InputData) Dest() string {
 
 func (i *InputData) Comp() string {
 	if i.CommandType() != C_COMMAND {
-		return "current CommandType is not C_COMMAND"
+		fmt.Println("current CommandType is not C_COMMAND")
+		return ""
 	}
 
 	cmd := i.Text[i.Index]
@@ -157,7 +157,7 @@ func (i *InputData) Comp() string {
 		_, c, found := strings.Cut(cmd, "=")
 
 		if !found {
-			return "some error"
+			return ""
 		}
 		
 		cutDest = c
@@ -171,7 +171,7 @@ func (i *InputData) Comp() string {
 		c, _, found := strings.Cut(cutDest, ";")
 
 		if !found {
-			return "some error"
+			return ""
 		}
 
 		comp = c
@@ -179,13 +179,14 @@ func (i *InputData) Comp() string {
 		comp = cutDest
 	}
 
-	return strings.Trim(comp, " ")
+	return comp
 
 }
 
 func (i *InputData) Jump() string {
 	if i.CmdType != C_COMMAND {
-		return "current CommandType is not C_COMMAND"
+		fmt.Println("current CommandType is not C_COMMAND")
+		return ""
 	}
 
 	cmd := i.Text[i.Index]
@@ -196,5 +197,5 @@ func (i *InputData) Jump() string {
 		return "null"
 	}
 
-	return strings.Trim(jump, " ")
+	return jump
 }
