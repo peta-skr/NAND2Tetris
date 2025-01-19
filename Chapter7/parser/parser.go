@@ -43,25 +43,44 @@ func Constructor(filePath string) (VMCode, error) {
 	scanner := bufio.NewScanner(f)
 	length := 0
 	for scanner.Scan() {
-		length++
-		inputData.data = append(inputData.data, strings.Trim(scanner.Text(), " "))
+		text := strings.Trim(scanner.Text(), " ")
+		if !strings.HasPrefix(text, "//") {
+			length++
+			inputData.data = append(inputData.data, text)
+		}
 	}
 
-	inputData.
+	inputData.length = length
+
+	return inputData, nil
 }
 
-func HasMoreCommands() bool {
-	return true
+func (v *VMCode) HasMoreCommands() bool {
+	return v.length > v.index
 }
 
-func CommandType() Command {
-	return C_ARITHMETIC
+func (v *VMCode) Advance() {
+	if !v.HasMoreCommands() {
+		return
+	}
+
+	v.index++
+
+	v.cmdType = C_ARITHMETIC
 }
 
-func Arg1() string {
+func (v *VMCode) CommandType() CmdType {
+	return v.cmdType
+}
+
+func (v *VMCode) Arg1() string {
+	if v.cmdType == C_ARITHMETIC {
+		l := strings.Split(v.data[v.index], " ")
+		return l[0]
+	}
 	return ""
 }
 
-func Arg2() int {
+func Arg2() int {	
 	return 0
 }
