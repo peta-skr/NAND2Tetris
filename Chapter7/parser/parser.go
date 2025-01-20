@@ -66,7 +66,11 @@ func (v *VMCode) Advance() {
 
 	v.index++
 
-	v.cmdType = C_ARITHMETIC
+	if strings.HasPrefix(v.data[v.index], "push") {
+		v.cmdType = C_PUSH
+	}else {
+		v.cmdType = C_ARITHMETIC
+	}
 }
 
 func (v *VMCode) CommandType() CmdType {
@@ -77,10 +81,17 @@ func (v *VMCode) Arg1() string {
 	if v.cmdType == C_ARITHMETIC {
 		l := strings.Split(v.data[v.index], " ")
 		return l[0]
+	}else if v.cmdType == C_PUSH {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
 	}
 	return ""
 }
 
-func Arg2() int {	
-	return 0
+func (v *VMCode) Arg2() string {	
+	if v.cmdType == C_PUSH {
+		l := strings.Split(v.data[v.index], " ")
+		return l[2]
+	}
+	return ""
 }

@@ -10,8 +10,8 @@ type Output struct {
 	filename string
 }
 
-func Constructor() Output {
-	file, err := os.OpenFile("./example.txt", os.O_CREATE | os.O_WRONLY | os.O_TRUNC, 0644)
+func Constructor(filepath string) Output {
+	file, err := os.OpenFile(filepath, os.O_CREATE | os.O_WRONLY | os.O_TRUNC, 0644)
 
 	if err != nil {
 		fmt.Println("ファイルを開けませんでした:", err)
@@ -29,15 +29,22 @@ func (o *Output) SetFileName(filename string) {
 	o.filename = filename
 }
 
-func WriteArithmetic(command string) {
-	
+func (o *Output) WriteArithmetic(command string) {
+
+	switch command {
+	case "add":
+		_, _ = o.file.WriteString("")
+	case "sub":
+	case "neg":
+	}
+
 }
 
 func writePushPop() {
 	
 }
 
-func close() {
-	defer file.Close()
+func (o *Output) close() {
+	o.file.Close()
 	
 }
