@@ -56,7 +56,7 @@ func Constructor(filePath string) (VMCode, error) {
 }
 
 func (v *VMCode) HasMoreCommands() bool {
-	return v.length > v.index
+	return v.length > v.index + 1
 }
 
 func (v *VMCode) Advance() {

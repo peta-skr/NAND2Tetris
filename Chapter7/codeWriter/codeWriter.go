@@ -33,10 +33,10 @@ func (o *Output) WriteArithmetic(command string) {
 
 	switch command {
 	case "add":
-		_, _ = o.file.WriteString("")
 	case "sub":
 	case "neg":
 	}
+	_, _ = o.file.WriteString(command + "\n")
 
 }
 
