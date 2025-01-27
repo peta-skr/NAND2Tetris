@@ -11,6 +11,7 @@ import (
 
 // var Constant [32768]int
 var Stack = make([]int, 0)
+var Local = make([]int, 0)
 
 func main() {
 	parseData, err := parser.Constructor("./test/StackTest/StackTest.vm")
@@ -20,6 +21,26 @@ func main() {
 		fmt.Println("some Error")
 		return
 	}
+
+	output.WriteArithmetic("@300")
+	output.WriteArithmetic("D=A")
+	output.WriteArithmetic("@LCL")
+	output.WriteArithmetic("M=D")
+	
+	output.WriteArithmetic("@400")
+	output.WriteArithmetic("D=A")
+	output.WriteArithmetic("@ARG")
+	output.WriteArithmetic("M=D")
+	
+	output.WriteArithmetic("@3000")
+	output.WriteArithmetic("D=A")
+	output.WriteArithmetic("@THIS")
+	output.WriteArithmetic("M=D")
+	
+	output.WriteArithmetic("@3010")
+	output.WriteArithmetic("D=A")
+	output.WriteArithmetic("@THAT")
+	output.WriteArithmetic("M=D")
 
 	for parseData.HasMoreCommands() {
 		parseData.Advance()
@@ -240,6 +261,47 @@ func main() {
 				output.WriteArithmetic("M=M+1")
 			}
 		case parser.C_PUSH:
+			switch parseData.Arg1() {
+			case "constant":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+			if err != nil {
+				fmt.Println("some Error")
+				return
+			}
+			str1 := "@" + strconv.Itoa(len(Stack) + 256)
+			output.WriteArithmetic(str1)
+			Stack = append(Stack, num)
+			output.WriteArithmetic("D=A")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("M=D")
+			output.WriteArithmetic("@"+str)
+			output.WriteArithmetic("D=A")
+			output.WriteArithmetic(str1)
+			output.WriteArithmetic("M=D")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("M=M+1")
+		case "local":
+			str := parseData.Arg2()
+			num, err := strconv.Atoi(str)
+		if err != nil {
+			fmt.Println("some Error")
+			return
+		}
+		str1 := "@" + strconv.Itoa(len(Stack) + 256)
+		output.WriteArithmetic(str1)
+		Stack = append(Stack, num)
+		output.WriteArithmetic("D=A")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@"+str)
+		output.WriteArithmetic("D=A")
+		output.WriteArithmetic(str1)
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
+		}
+		case parser.C_POP:
 			str := parseData.Arg2()
 			num, err := strconv.Atoi(str)
 			if err != nil {
