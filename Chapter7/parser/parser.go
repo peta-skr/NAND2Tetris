@@ -68,6 +68,8 @@ func (v *VMCode) Advance() {
 
 	if strings.HasPrefix(v.data[v.index], "push") {
 		v.cmdType = C_PUSH
+	}else if strings.HasPrefix(v.data[v.index], "pop") {
+		v.cmdType = C_POP
 	}else {
 		v.cmdType = C_ARITHMETIC
 	}
@@ -84,12 +86,18 @@ func (v *VMCode) Arg1() string {
 	}else if v.cmdType == C_PUSH {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
+	}else if v.cmdType == C_POP {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
 	}
 	return ""
 }
 
 func (v *VMCode) Arg2() string {	
 	if v.cmdType == C_PUSH {
+		l := strings.Split(v.data[v.index], " ")
+		return l[2]
+	}else if v.cmdType == C_POP {
 		l := strings.Split(v.data[v.index], " ")
 		return l[2]
 	}

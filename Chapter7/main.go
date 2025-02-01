@@ -14,13 +14,18 @@ var Stack = make([]int, 0)
 var Local = make([]int, 0)
 
 func main() {
-	parseData, err := parser.Constructor("./test/StackTest/StackTest.vm")
-	output := codewriter.Constructor("./test/StackTest/StackTest.asm")
+	parseData, err := parser.Constructor("./test/BasicTest/BasicTest.vm")
+	output := codewriter.Constructor("./test/BasicTest/BasicTest.asm")
 
 	if err != nil {
 		fmt.Println("some Error")
 		return
 	}
+
+	output.WriteArithmetic("@256")
+	output.WriteArithmetic("D=A")
+	output.WriteArithmetic("@SP")
+	output.WriteArithmetic("M=D")
 
 	output.WriteArithmetic("@300")
 	output.WriteArithmetic("D=A")
@@ -295,30 +300,252 @@ func main() {
 		output.WriteArithmetic("M=D")
 		output.WriteArithmetic("@LCL")
 		output.WriteArithmetic("D=M")
+		// output.WriteArithmetic("@" + str)
+		// output.WriteArithmetic("D=D+A")
+		// output.WriteArithmetic("A=D")
+		// output.WriteArithmetic("M=0")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
+		case "argument":
+			str := parseData.Arg2()
+		// 	num, err := strconv.Atoi(str)
+		// if err != nil {
+		// 	fmt.Println("some Error")
+		// 	return
+		// }
+		output.WriteArithmetic("@ARG")
+		output.WriteArithmetic("D=M")
 		output.WriteArithmetic("@" + str)
 		output.WriteArithmetic("D=D+A")
 		output.WriteArithmetic("A=D")
-		output.WriteArithmetic("M=0")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("A=M")
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@ARG")
+		output.WriteArithmetic("D=M")
+		// output.WriteArithmetic("@" + str)
+		// output.WriteArithmetic("D=D+A")
+		// output.WriteArithmetic("A=D")
+		// output.WriteArithmetic("M=0")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
+		case "this":
+			str := parseData.Arg2()
+		// 	num, err := strconv.Atoi(str)
+		// if err != nil {
+		// 	fmt.Println("some Error")
+		// 	return
+		// }
+		output.WriteArithmetic("@THIS")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@" + str)
+		output.WriteArithmetic("D=D+A")
+		output.WriteArithmetic("A=D")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("A=M")
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@THIS")
+		output.WriteArithmetic("D=M")
+		// output.WriteArithmetic("@" + str)
+		// output.WriteArithmetic("D=D+A")
+		// output.WriteArithmetic("A=D")
+		// output.WriteArithmetic("M=0")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
+		case "that":
+			str := parseData.Arg2()
+		// 	num, err := strconv.Atoi(str)
+		// if err != nil {
+		// 	fmt.Println("some Error")
+		// 	return
+		// }
+		output.WriteArithmetic("@THAT")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@" + str)
+		output.WriteArithmetic("D=D+A")
+		output.WriteArithmetic("A=D")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("A=M")
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@THAT")
+		output.WriteArithmetic("D=M")
+		// output.WriteArithmetic("@" + str)
+		// output.WriteArithmetic("D=D+A")
+		// output.WriteArithmetic("A=D")
+		// output.WriteArithmetic("M=0")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
+		case "temp":
+			str := parseData.Arg2()
+		// 	num, err := strconv.Atoi(str)
+		// if err != nil {
+		// 	fmt.Println("some Error")
+		// 	return
+		// }
+		output.WriteArithmetic("@R5")
+		output.WriteArithmetic("D=A")
+		output.WriteArithmetic("@" + str)
+		output.WriteArithmetic("D=D+A")
+		output.WriteArithmetic("A=D")
+		output.WriteArithmetic("D=M")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("A=M")
+		output.WriteArithmetic("M=D")
+		output.WriteArithmetic("@R5")
+		output.WriteArithmetic("D=M")
+		// output.WriteArithmetic("@" + str)
+		// output.WriteArithmetic("D=D+A")
+		// output.WriteArithmetic("A=D")
+		// output.WriteArithmetic("M=0")
+		output.WriteArithmetic("@SP")
+		output.WriteArithmetic("M=M+1")
 		}
 		case parser.C_POP:
-			str := parseData.Arg2()
-			num, err := strconv.Atoi(str)
-			if err != nil {
-				fmt.Println("some Error")
-				return
+			switch parseData.Arg1() {
+			case "constant":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@"+str)
+				output.WriteArithmetic("D=A")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M+1")
+			case "local":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@LCL")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@" + str)
+				output.WriteArithmetic("D=D+A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
+			case "argument":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@ARG")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@" + str)
+				output.WriteArithmetic("D=D+A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
+			case "this":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@THIS")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@" + str)
+				output.WriteArithmetic("D=D+A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
+			case "that":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@THAT")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@" + str)
+				output.WriteArithmetic("D=D+A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
+			case "temp":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+				Stack = append(Stack, num)
+				output.WriteArithmetic("@R5")
+				output.WriteArithmetic("D=A")
+				output.WriteArithmetic("@" + str)
+				output.WriteArithmetic("D=D+A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
 			}
-			str1 := "@" + strconv.Itoa(len(Stack) + 256)
-			output.WriteArithmetic(str1)
-			Stack = append(Stack, num)
-			output.WriteArithmetic("D=A")
-			output.WriteArithmetic("@SP")
-			output.WriteArithmetic("M=D")
-			output.WriteArithmetic("@"+str)
-			output.WriteArithmetic("D=A")
-			output.WriteArithmetic(str1)
-			output.WriteArithmetic("M=D")
-			output.WriteArithmetic("@SP")
-			output.WriteArithmetic("M=M+1")
 		}
 	}
 }
