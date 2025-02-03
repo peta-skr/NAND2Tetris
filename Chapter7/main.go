@@ -14,8 +14,8 @@ var Stack = make([]int, 0)
 var Local = make([]int, 0)
 
 func main() {
-	parseData, err := parser.Constructor("./test/BasicTest/BasicTest.vm")
-	output := codewriter.Constructor("./test/BasicTest/BasicTest.asm")
+	parseData, err := parser.Constructor("./test/PointerTest/PointerTest.vm")
+	output := codewriter.Constructor("./test/PointerTest/PointerTest.asm")
 
 	if err != nil {
 		fmt.Println("some Error")
@@ -380,28 +380,61 @@ func main() {
 		output.WriteArithmetic("M=M+1")
 		case "temp":
 			str := parseData.Arg2()
-		// 	num, err := strconv.Atoi(str)
-		// if err != nil {
-		// 	fmt.Println("some Error")
-		// 	return
-		// }
-		output.WriteArithmetic("@R5")
-		output.WriteArithmetic("D=A")
-		output.WriteArithmetic("@" + str)
-		output.WriteArithmetic("D=D+A")
-		output.WriteArithmetic("A=D")
-		output.WriteArithmetic("D=M")
-		output.WriteArithmetic("@SP")
-		output.WriteArithmetic("A=M")
-		output.WriteArithmetic("M=D")
-		output.WriteArithmetic("@R5")
-		output.WriteArithmetic("D=M")
-		// output.WriteArithmetic("@" + str)
-		// output.WriteArithmetic("D=D+A")
-		// output.WriteArithmetic("A=D")
-		// output.WriteArithmetic("M=0")
-		output.WriteArithmetic("@SP")
-		output.WriteArithmetic("M=M+1")
+			// 	num, err := strconv.Atoi(str)
+			// if err != nil {
+			// 	fmt.Println("some Error")
+			// 	return
+			// }
+			output.WriteArithmetic("@R5")
+			output.WriteArithmetic("D=A")
+			output.WriteArithmetic("@" + str)
+			output.WriteArithmetic("D=D+A")
+			output.WriteArithmetic("A=D")
+			output.WriteArithmetic("D=M")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("A=M")
+			output.WriteArithmetic("M=D")
+			output.WriteArithmetic("@R5")
+			output.WriteArithmetic("D=M")
+			// output.WriteArithmetic("@" + str)
+			// output.WriteArithmetic("D=D+A")
+			// output.WriteArithmetic("A=D")
+			// output.WriteArithmetic("M=0")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("M=M+1")
+		case "pointer":
+			str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+			if err != nil {
+				fmt.Println("some Error")
+				return
+			}
+
+			if num == 0 {
+				output.WriteArithmetic("@THIS")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				// output.WriteArithmetic("@" + str)
+				// output.WriteArithmetic("D=D+A")
+				// output.WriteArithmetic("A=D")
+				// output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M+1")
+			}else {
+				output.WriteArithmetic("@THAT")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				// output.WriteArithmetic("@" + str)
+				// output.WriteArithmetic("D=D+A")
+				// output.WriteArithmetic("A=D")
+				// output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M+1")
+			}
 		}
 		case parser.C_POP:
 			switch parseData.Arg1() {
@@ -545,10 +578,38 @@ func main() {
 				output.WriteArithmetic("M=D")
 				output.WriteArithmetic("@R13")
 				output.WriteArithmetic("M=0")
+			case "pointer":
+				str := parseData.Arg2()
+				num, err := strconv.Atoi(str)
+				if err != nil {
+					fmt.Println("some Error")
+					return
+				}
+
+				if num == 0 {
+					Stack = append(Stack, num)
+					output.WriteArithmetic("@SP")
+					output.WriteArithmetic("M=M-1")
+					output.WriteArithmetic("@SP")
+					output.WriteArithmetic("A=M")
+					output.WriteArithmetic("D=M")
+					output.WriteArithmetic("M=0")
+					output.WriteArithmetic("@THIS")
+					output.WriteArithmetic("M=D")
+				}else {
+					output.WriteArithmetic("@SP")
+					output.WriteArithmetic("M=M-1")
+					output.WriteArithmetic("@SP")
+					output.WriteArithmetic("A=M")
+					output.WriteArithmetic("D=M")
+					output.WriteArithmetic("M=0")
+					output.WriteArithmetic("@THAT")
+					output.WriteArithmetic("M=D")
+				}
+				}
 			}
 		}
 	}
-}
 
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 // https://qiita.com/srtkkou/items/ccbddc881d6f3549baf1
