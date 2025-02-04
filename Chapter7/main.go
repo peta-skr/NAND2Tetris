@@ -14,8 +14,8 @@ var Stack = make([]int, 0)
 var Local = make([]int, 0)
 
 func main() {
-	parseData, err := parser.Constructor("./test/PointerTest/PointerTest.vm")
-	output := codewriter.Constructor("./test/PointerTest/PointerTest.asm")
+	parseData, err := parser.Constructor("./test/StaticTest/StaticTest.vm")
+	output := codewriter.Constructor("./test/StaticTest/StaticTest.asm")
 
 	if err != nil {
 		fmt.Println("some Error")
@@ -435,6 +435,20 @@ func main() {
 				output.WriteArithmetic("@SP")
 				output.WriteArithmetic("M=M+1")
 			}
+		case "static":
+
+			str := parseData.Arg2()
+
+			output.WriteArithmetic("@16")
+			output.WriteArithmetic("D=A")
+			output.WriteArithmetic("@" + str)
+			output.WriteArithmetic("A=D+A")
+			output.WriteArithmetic("D=M")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("A=M")
+			output.WriteArithmetic("M=D")
+			output.WriteArithmetic("@SP")
+			output.WriteArithmetic("M=M+1")
 		}
 		case parser.C_POP:
 			switch parseData.Arg1() {
@@ -606,6 +620,28 @@ func main() {
 					output.WriteArithmetic("@THAT")
 					output.WriteArithmetic("M=D")
 				}
+			case "static":
+				str := parseData.Arg2()
+	
+				output.WriteArithmetic("@16")
+				output.WriteArithmetic("D=A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@"+str)
+				output.WriteArithmetic("D=A")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=D+M")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("M=M-1")
+				output.WriteArithmetic("@SP")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("D=M")
+				output.WriteArithmetic("M=0")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("A=M")
+				output.WriteArithmetic("M=D")
+				output.WriteArithmetic("@R13")
+				output.WriteArithmetic("M=0")
 				}
 			}
 		}
