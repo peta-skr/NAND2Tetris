@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+
+	"github.com/peta-skr/NAND2Tetris/Chapter7/parser"
 )
 
 type Output struct {
@@ -148,6 +150,39 @@ func (o *Output) WriteArithmetic(command string) {
 		o.WriteCode("M=-M")
 		o.WriteCode("@SP")
 		o.WriteCode("M=M+1")
+	case "and":
+
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("D=M")
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("M=D&M")
+		o.WriteCode("@SP")
+		o.WriteCode("M=M+1")
+	case "or":
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("D=M")
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("M=D|M")
+		o.WriteCode("@SP")
+		o.WriteCode("M=M+1")
+	case "not":
+
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("M=!M")
+		o.WriteCode("@SP")
+		o.WriteCode("M=M+1")
+	default:
+		o.WriteCode(command)
 	}
 
 }
@@ -156,8 +191,123 @@ func (o *Output) WriteCode(command string) {
 	_, _ = o.file.WriteString(command + "\n")
 }
 
-func writePushPop() {
+func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 string) {
+	switch cmdType {
+	case parser.C_PUSH:
+		switch command {
+		case "constant":
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=A")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		case "local":
+			o.WriteCode("@LCL")
+			o.WriteCode("D=M")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=D+A")
+			o.WriteCode("A=D")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@LCL")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		case "argument":
+			o.WriteCode("@ARG")
+			o.WriteCode("D=M")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=D+A")
+			o.WriteCode("A=D")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@ARG")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		case "this":
+			o.WriteCode("@THIS")
+			o.WriteCode("D=M")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=D+A")
+			o.WriteCode("A=D")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@THIS")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
 
+		case "that":
+			o.WriteCode("@THAT")
+			o.WriteCode("D=M")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=D+A")
+			o.WriteCode("A=D")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@THAT")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		case "temp":
+			o.WriteCode("@R5")
+			o.WriteCode("D=A")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=D+A")
+			o.WriteCode("A=D")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@R5")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		case "pointer":
+
+			if arg2 == "0" {
+				o.WriteCode("@THIS")
+				o.WriteCode("D=M")
+				o.WriteCode("@SP")
+				o.WriteCode("A=M")
+				o.WriteCode("M=D")
+				o.WriteCode("@SP")
+				o.WriteCode("M=M+1")
+			} else {
+				o.WriteCode("@THAT")
+				o.WriteCode("D=M")
+				o.WriteCode("@SP")
+				o.WriteCode("A=M")
+				o.WriteCode("M=D")
+				o.WriteCode("@SP")
+				o.WriteCode("M=M+1")
+			}
+		case "static":
+			o.WriteCode("@16")
+			o.WriteCode("D=A")
+			o.WriteCode("@" + arg2)
+			o.WriteCode("A=D+A")
+			o.WriteCode("D=M")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
+		}
+	case parser.C_POP:
+
+	}
 }
 
 func (o *Output) close() {

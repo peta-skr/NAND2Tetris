@@ -14,8 +14,12 @@ var Stack = make([]int, 0)
 var Local = make([]int, 0)
 
 func main() {
-	parseData, err := parser.Constructor("./test/StackTest/StackTest.vm")
-	output := codewriter.Constructor("./test/StackTest/StackTest.asm")
+	vm("./test/BasicTest/BasicTest.vm", "./test/BasicTest/BasicTest.asm")
+}
+
+func vm(inputfile string, outputfile string) {
+	parseData, err := parser.Constructor(inputfile)
+	output := codewriter.Constructor(outputfile)
 
 	if err != nil {
 		fmt.Println("some Error")
@@ -65,211 +69,33 @@ func main() {
 			case "gt":
 				output.WriteArithmetic("gt")
 			case "neg":
-				output.WriteArithmetic("gt")
+				output.WriteArithmetic("neg")
 			case "and":
-
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M-1")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M-1")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D&M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WriteArithmetic("and")
 			case "or":
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M-1")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M-1")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D|M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WriteArithmetic("or")
 			case "not":
-
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M-1")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=!M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WriteArithmetic("not")
 			}
 		case parser.C_PUSH:
 			switch parseData.Arg1() {
 			case "constant":
-				str := parseData.Arg2()
-				num, err := strconv.Atoi(str)
-				if err != nil {
-					fmt.Println("some Error")
-					return
-				}
-				Stack = append(Stack, num)
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=A")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "constant", parseData.Arg2())
 			case "local":
-				str := parseData.Arg2()
-				// 	num, err := strconv.Atoi(str)
-				// if err != nil {
-				// 	fmt.Println("some Error")
-				// 	return
-				// }
-				output.WriteArithmetic("@LCL")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=D+A")
-				output.WriteArithmetic("A=D")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@LCL")
-				output.WriteArithmetic("D=M")
-				// output.WriteArithmetic("@" + str)
-				// output.WriteArithmetic("D=D+A")
-				// output.WriteArithmetic("A=D")
-				// output.WriteArithmetic("M=0")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "local", parseData.Arg2())
+
 			case "argument":
-				str := parseData.Arg2()
-				// 	num, err := strconv.Atoi(str)
-				// if err != nil {
-				// 	fmt.Println("some Error")
-				// 	return
-				// }
-				output.WriteArithmetic("@ARG")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=D+A")
-				output.WriteArithmetic("A=D")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@ARG")
-				output.WriteArithmetic("D=M")
-				// output.WriteArithmetic("@" + str)
-				// output.WriteArithmetic("D=D+A")
-				// output.WriteArithmetic("A=D")
-				// output.WriteArithmetic("M=0")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "argument", parseData.Arg2())
 			case "this":
-				str := parseData.Arg2()
-				// 	num, err := strconv.Atoi(str)
-				// if err != nil {
-				// 	fmt.Println("some Error")
-				// 	return
-				// }
-				output.WriteArithmetic("@THIS")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=D+A")
-				output.WriteArithmetic("A=D")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@THIS")
-				output.WriteArithmetic("D=M")
-				// output.WriteArithmetic("@" + str)
-				// output.WriteArithmetic("D=D+A")
-				// output.WriteArithmetic("A=D")
-				// output.WriteArithmetic("M=0")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "this", parseData.Arg2())
 			case "that":
-				str := parseData.Arg2()
-				// 	num, err := strconv.Atoi(str)
-				// if err != nil {
-				// 	fmt.Println("some Error")
-				// 	return
-				// }
-				output.WriteArithmetic("@THAT")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=D+A")
-				output.WriteArithmetic("A=D")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@THAT")
-				output.WriteArithmetic("D=M")
-				// output.WriteArithmetic("@" + str)
-				// output.WriteArithmetic("D=D+A")
-				// output.WriteArithmetic("A=D")
-				// output.WriteArithmetic("M=0")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "that", parseData.Arg2())
 			case "temp":
-				str := parseData.Arg2()
-				// 	num, err := strconv.Atoi(str)
-				// if err != nil {
-				// 	fmt.Println("some Error")
-				// 	return
-				// }
-				output.WriteArithmetic("@R5")
-				output.WriteArithmetic("D=A")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("D=D+A")
-				output.WriteArithmetic("A=D")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@R5")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "temp", parseData.Arg2())
 			case "pointer":
-				str := parseData.Arg2()
-				num, err := strconv.Atoi(str)
-				if err != nil {
-					fmt.Println("some Error")
-					return
-				}
-
-				if num == 0 {
-					output.WriteArithmetic("@THIS")
-					output.WriteArithmetic("D=M")
-					output.WriteArithmetic("@SP")
-					output.WriteArithmetic("A=M")
-					output.WriteArithmetic("M=D")
-					output.WriteArithmetic("@SP")
-					output.WriteArithmetic("M=M+1")
-				} else {
-					output.WriteArithmetic("@THAT")
-					output.WriteArithmetic("D=M")
-					output.WriteArithmetic("@SP")
-					output.WriteArithmetic("A=M")
-					output.WriteArithmetic("M=D")
-					output.WriteArithmetic("@SP")
-					output.WriteArithmetic("M=M+1")
-				}
+				output.WritePushPop(parser.C_PUSH, "pointer", parseData.Arg2())
 			case "static":
-
-				str := parseData.Arg2()
-
-				output.WriteArithmetic("@16")
-				output.WriteArithmetic("D=A")
-				output.WriteArithmetic("@" + str)
-				output.WriteArithmetic("A=D+A")
-				output.WriteArithmetic("D=M")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("A=M")
-				output.WriteArithmetic("M=D")
-				output.WriteArithmetic("@SP")
-				output.WriteArithmetic("M=M+1")
+				output.WritePushPop(parser.C_PUSH, "static", parseData.Arg2())
 			}
 		case parser.C_POP:
 			switch parseData.Arg1() {
