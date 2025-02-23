@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -21,9 +22,9 @@ const (
 )
 
 type VMCode struct {
-	data []string
-	length int
-	index int
+	data    []string
+	length  int
+	index   int
 	cmdType CmdType
 }
 
@@ -43,7 +44,7 @@ func Constructor(filePath string) (VMCode, error) {
 	scanner := bufio.NewScanner(f)
 	length := 0
 	for scanner.Scan() {
-		text := strings.Trim(scanner.Text(), " ")
+		text := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(text, "//") {
 			length++
 			inputData.data = append(inputData.data, text)
@@ -56,7 +57,7 @@ func Constructor(filePath string) (VMCode, error) {
 }
 
 func (v *VMCode) HasMoreCommands() bool {
-	return v.length > v.index + 1
+	return v.length > v.index+1
 }
 
 func (v *VMCode) Advance() {
@@ -66,11 +67,17 @@ func (v *VMCode) Advance() {
 
 	v.index++
 
+	fmt.Println(v.data[v.index])
+
 	if strings.HasPrefix(v.data[v.index], "push") {
 		v.cmdType = C_PUSH
-	}else if strings.HasPrefix(v.data[v.index], "pop") {
+	} else if strings.HasPrefix(v.data[v.index], "pop") {
 		v.cmdType = C_POP
-	}else {
+	} else if strings.HasPrefix(v.data[v.index], "label") {
+		v.cmdType = C_LABEL
+	} else if strings.HasPrefix(v.data[v.index], "if-goto") {
+		v.cmdType = C_IF
+	} else {
 		v.cmdType = C_ARITHMETIC
 	}
 }
@@ -83,21 +90,27 @@ func (v *VMCode) Arg1() string {
 	if v.cmdType == C_ARITHMETIC {
 		l := strings.Split(v.data[v.index], " ")
 		return l[0]
-	}else if v.cmdType == C_PUSH {
+	} else if v.cmdType == C_PUSH {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
-	}else if v.cmdType == C_POP {
+	} else if v.cmdType == C_POP {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
+	} else if v.cmdType == C_LABEL {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
+	} else if v.cmdType == C_IF {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
 	}
 	return ""
 }
 
-func (v *VMCode) Arg2() string {	
+func (v *VMCode) Arg2() string {
 	if v.cmdType == C_PUSH {
 		l := strings.Split(v.data[v.index], " ")
 		return l[2]
-	}else if v.cmdType == C_POP {
+	} else if v.cmdType == C_POP {
 		l := strings.Split(v.data[v.index], " ")
 		return l[2]
 	}

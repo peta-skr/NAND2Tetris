@@ -308,14 +308,14 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 	case parser.C_POP:
 		switch command {
 
-		case "constant":
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=A")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
+		// case "constant":
+		// 	o.WriteCode("@" + arg2)
+		// 	o.WriteCode("D=A")
+		// 	o.WriteCode("@SP")
+		// 	o.WriteCode("A=M")
+		// 	o.WriteCode("M=D")
+		// 	o.WriteCode("@SP")
+		// 	o.WriteCode("M=M+1")
 		case "local":
 			o.WriteCode("@LCL")
 			o.WriteCode("D=M")
@@ -452,6 +452,44 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 
 func (o *Output) close() {
 	o.file.Close()
+
+}
+
+func (o *Output) WriteInit() {}
+
+func (o *Output) WriteLabel(label string) {
+	o.WriteCode("(" + label + ")")
+}
+
+func (o *Output) WriteGoto(label string) {
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M")
+	o.WriteCode("@" + label)
+	o.WriteCode("0;JMP")
+}
+
+func (o *Output) WriteIf(label string) {
+
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M")
+	o.WriteCode("@" + label)
+	o.WriteCode("D;JNE")
+
+}
+
+func (o *Output) WriteCall() {
+
+}
+
+func (o *Output) WriteReturn() {
+
+}
+
+func (o *Output) WriteFunction() {
 
 }
 

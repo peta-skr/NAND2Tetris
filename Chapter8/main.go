@@ -12,7 +12,7 @@ var Stack = make([]int, 0)
 var Local = make([]int, 0)
 
 func main() {
-	vm("./test/BasicTest/BasicTest.vm", "./test/BasicTest/BasicTest.asm")
+	vm("./test/FibonacciSeries/FibonacciSeries.vm", "./test/FibonacciSeries/FibonacciSeries.asm")
 }
 
 func vm(inputfile string, outputfile string) {
@@ -48,6 +48,7 @@ func vm(inputfile string, outputfile string) {
 	output.WriteArithmetic("D=A")
 	output.WriteArithmetic("@THAT")
 	output.WriteArithmetic("M=D")
+	fmt.Println(parseData)
 
 	for parseData.HasMoreCommands() {
 		parseData.Advance()
@@ -114,6 +115,10 @@ func vm(inputfile string, outputfile string) {
 			case "static":
 				output.WritePushPop(parser.C_POP, "static", parseData.Arg2())
 			}
+		case parser.C_LABEL:
+			output.WriteLabel(parseData.Arg1())
+		case parser.C_IF:
+			output.WriteIf(parseData.Arg1())
 		}
 	}
 }
