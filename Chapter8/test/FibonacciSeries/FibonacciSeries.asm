@@ -61,8 +61,6 @@ M=0
 @R13
 A=M
 M=D
-@R13
-M=0
 @1
 D=A
 @SP
@@ -85,8 +83,6 @@ M=0
 @R13
 A=M
 M=D
-@R13
-M=0
 @ARG
 D=M
 @0
@@ -154,6 +150,8 @@ A=M
 D=M
 @COMPUTE_ELEMENT
 D;JNE
+@END
+0;JMP
 (COMPUTE_ELEMENT)
 @THAT
 D=M
@@ -206,8 +204,6 @@ M=0
 @R13
 A=M
 M=D
-@R13
-M=0
 @THAT
 D=M
 @SP
@@ -287,4 +283,6 @@ A=M
 M=D
 @R13
 M=0
+@LOOP
+0;JMP
 (END)

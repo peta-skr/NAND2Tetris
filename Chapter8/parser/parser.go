@@ -77,6 +77,8 @@ func (v *VMCode) Advance() {
 		v.cmdType = C_LABEL
 	} else if strings.HasPrefix(v.data[v.index], "if-goto") {
 		v.cmdType = C_IF
+	} else if strings.HasPrefix(v.data[v.index], "goto") {
+		v.cmdType = C_GOTO
 	} else {
 		v.cmdType = C_ARITHMETIC
 	}
@@ -100,6 +102,9 @@ func (v *VMCode) Arg1() string {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
 	} else if v.cmdType == C_IF {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
+	} else if v.cmdType == C_GOTO {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
 	}

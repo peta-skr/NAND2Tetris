@@ -308,14 +308,14 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 	case parser.C_POP:
 		switch command {
 
-		// case "constant":
-		// 	o.WriteCode("@" + arg2)
-		// 	o.WriteCode("D=A")
-		// 	o.WriteCode("@SP")
-		// 	o.WriteCode("A=M")
-		// 	o.WriteCode("M=D")
-		// 	o.WriteCode("@SP")
-		// 	o.WriteCode("M=M+1")
+		case "constant":
+			o.WriteCode("@" + arg2)
+			o.WriteCode("D=A")
+			o.WriteCode("@SP")
+			o.WriteCode("A=M")
+			o.WriteCode("M=D")
+			o.WriteCode("@SP")
+			o.WriteCode("M=M+1")
 		case "local":
 			o.WriteCode("@LCL")
 			o.WriteCode("D=M")
@@ -332,8 +332,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		case "argument":
 			o.WriteCode("@ARG")
 			o.WriteCode("D=M")
@@ -350,8 +350,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		case "this":
 			o.WriteCode("@THIS")
 			o.WriteCode("D=M")
@@ -368,8 +368,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		case "that":
 			o.WriteCode("@THAT")
 			o.WriteCode("D=M")
@@ -386,8 +386,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		case "temp":
 			o.WriteCode("@R5")
 			o.WriteCode("D=A")
@@ -404,8 +404,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		case "pointer":
 			if arg2 == "0" {
 				o.WriteCode("@SP")
@@ -444,8 +444,8 @@ func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 strin
 			o.WriteCode("@R13")
 			o.WriteCode("A=M")
 			o.WriteCode("M=D")
-			o.WriteCode("@R13")
-			o.WriteCode("M=0")
+			// o.WriteCode("@R13")
+			// o.WriteCode("M=0")
 		}
 	}
 }
@@ -462,10 +462,6 @@ func (o *Output) WriteLabel(label string) {
 }
 
 func (o *Output) WriteGoto(label string) {
-	o.WriteCode("@SP")
-	o.WriteCode("M=M-1")
-	o.WriteCode("A=M")
-	o.WriteCode("D=M")
 	o.WriteCode("@" + label)
 	o.WriteCode("0;JMP")
 }

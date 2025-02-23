@@ -119,6 +119,8 @@ func vm(inputfile string, outputfile string) {
 			output.WriteLabel(parseData.Arg1())
 		case parser.C_IF:
 			output.WriteIf(parseData.Arg1())
+		case parser.C_GOTO:
+			output.WriteGoto(parseData.Arg1())
 		}
 	}
 }
