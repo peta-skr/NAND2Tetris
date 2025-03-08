@@ -2,7 +2,6 @@ package parser
 
 import (
 	"bufio"
-	"fmt"
 	"os"
 	"strings"
 )
@@ -67,8 +66,6 @@ func (v *VMCode) Advance() {
 
 	v.index++
 
-	fmt.Println(v.data[v.index])
-
 	if strings.HasPrefix(v.data[v.index], "push") {
 		v.cmdType = C_PUSH
 	} else if strings.HasPrefix(v.data[v.index], "pop") {
@@ -79,6 +76,12 @@ func (v *VMCode) Advance() {
 		v.cmdType = C_IF
 	} else if strings.HasPrefix(v.data[v.index], "goto") {
 		v.cmdType = C_GOTO
+	} else if strings.HasPrefix(v.data[v.index], "call") {
+		v.cmdType = C_CALL
+	} else if strings.HasPrefix(v.data[v.index], "function") {
+		v.cmdType = C_FUNCTION
+	} else if strings.HasPrefix(v.data[v.index], "return") {
+		v.cmdType = C_RETURN
 	} else {
 		v.cmdType = C_ARITHMETIC
 	}
@@ -107,6 +110,12 @@ func (v *VMCode) Arg1() string {
 	} else if v.cmdType == C_GOTO {
 		l := strings.Split(v.data[v.index], " ")
 		return l[1]
+	} else if v.cmdType == C_CALL {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
+	} else if v.cmdType == C_FUNCTION {
+		l := strings.Split(v.data[v.index], " ")
+		return l[1]
 	}
 	return ""
 }
@@ -116,6 +125,12 @@ func (v *VMCode) Arg2() string {
 		l := strings.Split(v.data[v.index], " ")
 		return l[2]
 	} else if v.cmdType == C_POP {
+		l := strings.Split(v.data[v.index], " ")
+		return l[2]
+	} else if v.cmdType == C_CALL {
+		l := strings.Split(v.data[v.index], " ")
+		return l[2]
+	} else if v.cmdType == C_FUNCTION {
 		l := strings.Split(v.data[v.index], " ")
 		return l[2]
 	}
