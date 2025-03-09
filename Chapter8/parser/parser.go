@@ -41,16 +41,15 @@ func Constructor(filePath string) (VMCode, error) {
 	inputData.index = -1
 
 	scanner := bufio.NewScanner(f)
-	length := 0
 	for scanner.Scan() {
+		// コメントの削除と、前後の空白の削除
 		text := strings.TrimSpace(scanner.Text())
 		if !strings.HasPrefix(text, "//") {
-			length++
 			inputData.data = append(inputData.data, text)
 		}
 	}
 
-	inputData.length = length
+	inputData.length = len(inputData.data)
 
 	return inputData, nil
 }
@@ -65,24 +64,26 @@ func (v *VMCode) Advance() {
 	}
 
 	v.index++
+	line := v.data[v.index]
 
-	if strings.HasPrefix(v.data[v.index], "push") {
+	switch {
+	case strings.HasPrefix(line, "push"):
 		v.cmdType = C_PUSH
-	} else if strings.HasPrefix(v.data[v.index], "pop") {
+	case strings.HasPrefix(line, "pop"):
 		v.cmdType = C_POP
-	} else if strings.HasPrefix(v.data[v.index], "label") {
+	case strings.HasPrefix(line, "label"):
 		v.cmdType = C_LABEL
-	} else if strings.HasPrefix(v.data[v.index], "if-goto") {
+	case strings.HasPrefix(line, "if-goto"):
 		v.cmdType = C_IF
-	} else if strings.HasPrefix(v.data[v.index], "goto") {
+	case strings.HasPrefix(line, "goto"):
 		v.cmdType = C_GOTO
-	} else if strings.HasPrefix(v.data[v.index], "call") {
+	case strings.HasPrefix(line, "call"):
 		v.cmdType = C_CALL
-	} else if strings.HasPrefix(v.data[v.index], "function") {
+	case strings.HasPrefix(line, "function"):
 		v.cmdType = C_FUNCTION
-	} else if strings.HasPrefix(v.data[v.index], "return") {
+	case strings.HasPrefix(line, "return"):
 		v.cmdType = C_RETURN
-	} else {
+	default:
 		v.cmdType = C_ARITHMETIC
 	}
 }
@@ -92,47 +93,17 @@ func (v *VMCode) CommandType() CmdType {
 }
 
 func (v *VMCode) Arg1() string {
+	parts := strings.Split(v.data[v.index], " ")
 	if v.cmdType == C_ARITHMETIC {
-		l := strings.Split(v.data[v.index], " ")
-		return l[0]
-	} else if v.cmdType == C_PUSH {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_POP {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_LABEL {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_IF {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_GOTO {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_CALL {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
-	} else if v.cmdType == C_FUNCTION {
-		l := strings.Split(v.data[v.index], " ")
-		return l[1]
+		return parts[0]
 	}
-	return ""
+	return parts[1]
 }
 
 func (v *VMCode) Arg2() string {
-	if v.cmdType == C_PUSH {
-		l := strings.Split(v.data[v.index], " ")
-		return l[2]
-	} else if v.cmdType == C_POP {
-		l := strings.Split(v.data[v.index], " ")
-		return l[2]
-	} else if v.cmdType == C_CALL {
-		l := strings.Split(v.data[v.index], " ")
-		return l[2]
-	} else if v.cmdType == C_FUNCTION {
-		l := strings.Split(v.data[v.index], " ")
-		return l[2]
+	if v.cmdType == C_PUSH || v.cmdType == C_POP || v.cmdType == C_CALL || v.cmdType == C_FUNCTION {
+		parts := strings.Split(v.data[v.index], " ")
+		return parts[2]
 	}
 	return ""
 }

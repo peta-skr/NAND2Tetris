@@ -62,27 +62,6 @@ func vm(inputfile string, outputfile string, filename string) {
 	// call Sys.init
 	output.WriteCall("Sys.init", "0")
 
-	// output.WriteArithmetic("@300")
-	// output.WriteArithmetic("D=A")
-	// output.WriteArithmetic("@LCL")
-	// output.WriteArithmetic("M=D")
-
-	// output.WriteArithmetic("@400")
-	// output.WriteArithmetic("D=A")
-	// output.WriteArithmetic("@ARG")
-	// output.WriteArithmetic("M=D")
-
-	// output.WriteArithmetic("@3000")
-	// output.WriteArithmetic("D=A")
-	// output.WriteArithmetic("@THIS")
-	// output.WriteArithmetic("M=D")
-
-	// output.WriteArithmetic("@3010")
-	// output.WriteArithmetic("D=A")
-	// output.WriteArithmetic("@THAT")
-	// output.WriteArithmetic("M=D")
-	// fmt.Println(parseData)
-
 	for parseData.HasMoreCommands() {
 		parseData.Advance()
 

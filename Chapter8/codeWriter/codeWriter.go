@@ -23,11 +23,7 @@ func Constructor(filepath string) Output {
 		return Output{}
 	}
 
-	output := Output{
-		file: file,
-	}
-
-	return output
+	return Output{file: file}
 }
 
 func (o *Output) SetFileName(filename string) {
@@ -35,602 +31,181 @@ func (o *Output) SetFileName(filename string) {
 }
 
 func (o *Output) WriteArithmetic(command string) {
-
 	switch command {
-	case "add":
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=D+M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-	case "sub":
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=M-D")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-
-	case "eq":
-		label1 := RandomString()
-		label2 := RandomString()
-
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M-D")
-		o.WriteCode("@" + label1)
-		o.WriteCode("D;JEQ")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M")
-		o.WriteCode("A=M")
-		o.WriteCode("M=0")
-		o.WriteCode("@" + label2)
-		o.WriteCode("0;JMP")
-		o.WriteCode("(" + label1 + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M")
-		o.WriteCode("A=M")
-		o.WriteCode("M=-1")
-		o.WriteCode("(" + label2 + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-	case "lt":
-		// label1 := RandomString()
-		// label2 := RandomString()
-
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M-1")
-		// o.WriteCode("A=M")
-		// o.WriteCode("D=M")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M-1")
-		// o.WriteCode("A=M")
-		// o.WriteCode("D=M-D")
-		// o.WriteCode("@" + label1)
-		// o.WriteCode("D;JLT")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M")
-		// o.WriteCode("A=M")
-		// o.WriteCode("M=0")
-		// o.WriteCode("@" + label2)
-		// o.WriteCode("0;JMP")
-		// o.WriteCode("(" + label1 + ")")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M")
-		// o.WriteCode("A=M")
-		// o.WriteCode("M=-1")
-		// o.WriteCode("(" + label2 + ")")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M+1")
-
-		// より安全な比較演算(lt)の実装
-		// ランダムなユニークラベルを生成
-		label_y_neg := "Y_NEG_" + RandomString()
-		label_y_pos := "Y_POS_" + RandomString()
-		label_x_neg_y_neg := "X_NEG_Y_NEG_" + RandomString()
-		label_x_pos_y_pos := "X_POS_Y_POS_" + RandomString()
-		label_push_true := "PUSH_TRUE_" + RandomString()
-		label_push_false := "PUSH_FALSE_" + RandomString()
-		label_end := "END_" + RandomString()
-
-		// より安全な比較演算(lt)の実装
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // y値を取得
-		o.WriteCode("@" + label_y_neg)
-		o.WriteCode("D;JLT") // yが負数の場合分岐
-		o.WriteCode("@" + label_y_pos)
-		o.WriteCode("0;JMP") // yが正数の場合分岐
-
-		o.WriteCode("(" + label_y_neg + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // x値を取得
-		o.WriteCode("@" + label_x_neg_y_neg)
-		o.WriteCode("D;JLT") // xも負数の場合
-		// xは正、yは負 → x > y は常に真なので、x < y は常に偽(0)
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=0") // falseをプッシュ
-		o.WriteCode("@" + label_end)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_x_neg_y_neg + ")")
-		// 両方負の場合、通常の比較で問題なし（オーバーフローしない）
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックを戻す
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // yを再度取得
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")   // xにポイント
-		o.WriteCode("D=M-D") // x-y
-		o.WriteCode("@" + label_push_true)
-		o.WriteCode("D;JLT")
-		o.WriteCode("@" + label_push_false)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_y_pos + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // x値を取得
-		o.WriteCode("@" + label_x_pos_y_pos)
-		o.WriteCode("D;JGE") // xが正または0の場合
-		// xが負、yが正 → x < y は常に真
-		o.WriteCode("@" + label_push_true)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_x_pos_y_pos + ")")
-		// 両方正の場合、通常の比較で問題なし
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックを戻す
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // yを再度取得
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")   // xにポイント
-		o.WriteCode("D=M-D") // x-y
-		o.WriteCode("@" + label_push_true)
-		o.WriteCode("D;JLT")
-		o.WriteCode("@" + label_push_false)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_push_true + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=-1") // trueをプッシュ (-1)
-		o.WriteCode("@" + label_end)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_push_false + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=0") // falseをプッシュ (0)
-
-		o.WriteCode("(" + label_end + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックポインタを増加
-	case "gt":
-
-		// label1 := RandomString()
-		// label2 := RandomString()
-
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M-1")
-		// o.WriteCode("A=M")
-		// o.WriteCode("D=M")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M-1")
-		// o.WriteCode("A=M")
-		// o.WriteCode("D=M-D")
-		// o.WriteCode("@" + label1)
-		// o.WriteCode("D;JGT")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M")
-		// o.WriteCode("A=M")
-		// o.WriteCode("M=0")
-		// o.WriteCode("@" + label2)
-		// o.WriteCode("0;JMP")
-		// o.WriteCode("(" + label1 + ")")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M")
-		// o.WriteCode("A=M")
-		// o.WriteCode("M=-1")
-		// o.WriteCode("(" + label2 + ")")
-		// o.WriteCode("@SP")
-		// o.WriteCode("M=M+1")
-
-		// ランダムなユニークラベルを生成
-		label_y_neg := "Y_NEG_" + RandomString()
-		label_y_pos := "Y_POS_" + RandomString()
-		label_x_neg_y_neg := "X_NEG_Y_NEG_" + RandomString()
-		label_x_pos_y_pos := "X_POS_Y_POS_" + RandomString()
-		label_push_true := "PUSH_TRUE_" + RandomString()
-		label_push_false := "PUSH_FALSE_" + RandomString()
-		label_end := "END_" + RandomString()
-
-		// より安全な比較演算(gt)の実装
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // y値を取得
-		o.WriteCode("@" + label_y_neg)
-		o.WriteCode("D;JLT") // yが負数の場合分岐
-		o.WriteCode("@" + label_y_pos)
-		o.WriteCode("0;JMP") // yが正数の場合分岐
-
-		o.WriteCode("(" + label_y_neg + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // x値を取得
-		o.WriteCode("@" + label_x_neg_y_neg)
-		o.WriteCode("D;JLT") // xも負数の場合
-		// xは正、yは負 → x > y は常に真
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=-1") // trueをプッシュ
-		o.WriteCode("@" + label_end)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_x_neg_y_neg + ")")
-		// 両方負の場合、通常の比較で問題なし（オーバーフローしない）
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックを戻す
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // yを再度取得
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")   // xにポイント
-		o.WriteCode("D=M-D") // x-y
-		o.WriteCode("@" + label_push_true)
-		o.WriteCode("D;JGT") // ここがltとは逆（JGT）
-		o.WriteCode("@" + label_push_false)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_y_pos + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // x値を取得
-		o.WriteCode("@" + label_x_pos_y_pos)
-		o.WriteCode("D;JGE") // xが正または0の場合
-		// xが負、yが正 → x < y は常に真なので、x > y は常に偽
-		o.WriteCode("@" + label_push_false)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_x_pos_y_pos + ")")
-		// 両方正の場合、通常の比較で問題なし
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックを戻す
-		o.WriteCode("A=M")
-		o.WriteCode("D=M") // yを再度取得
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")   // xにポイント
-		o.WriteCode("D=M-D") // x-y
-		o.WriteCode("@" + label_push_true)
-		o.WriteCode("D;JGT") // ここがltとは逆（JGT）
-		o.WriteCode("@" + label_push_false)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_push_true + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=-1") // trueをプッシュ (-1)
-		o.WriteCode("@" + label_end)
-		o.WriteCode("0;JMP")
-
-		o.WriteCode("(" + label_push_false + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("A=M")
-		o.WriteCode("M=0") // falseをプッシュ (0)
-
-		o.WriteCode("(" + label_end + ")")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1") // スタックポインタを増加
-	case "neg":
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=-M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-	case "and":
-
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=D&M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-	case "or":
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("D=M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=D|M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
-	case "not":
-
-		o.WriteCode("@SP")
-		o.WriteCode("M=M-1")
-		o.WriteCode("A=M")
-		o.WriteCode("M=!M")
-		o.WriteCode("@SP")
-		o.WriteCode("M=M+1")
+	case "add", "sub", "and", "or":
+		o.binaryOperation(command)
+	case "neg", "not":
+		o.unaryOperation(command)
+	case "eq", "lt", "gt":
+		o.comparisonOperation(command)
 	default:
 		o.WriteCode(command)
 	}
+}
 
+func (o *Output) binaryOperation(command string) {
+	op := map[string]string{
+		"add": "M=D+M",
+		"sub": "M=M-D",
+		"and": "M=D&M",
+		"or":  "M=D|M",
+	}[command]
+
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M")
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode(op)
+	o.WriteCode("@SP")
+	o.WriteCode("M=M+1")
+}
+
+func (o *Output) unaryOperation(command string) {
+	op := map[string]string{
+		"neg": "M=-M",
+		"not": "M=!M",
+	}[command]
+
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode(op)
+	o.WriteCode("@SP")
+	o.WriteCode("M=M+1")
+}
+
+func (o *Output) comparisonOperation(command string) {
+	labelTrue := "TRUE_" + RandomString()
+	labelEnd := "END_" + RandomString()
+	jump := map[string]string{
+		"eq": "JEQ",
+		"lt": "JLT",
+		"gt": "JGT",
+	}[command]
+
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M")
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M-D")
+	o.WriteCode("@" + labelTrue)
+	o.WriteCode("D;" + jump)
+	o.WriteCode("@SP")
+	o.WriteCode("A=M")
+	o.WriteCode("M=0")
+	o.WriteCode("@" + labelEnd)
+	o.WriteCode("0;JMP")
+	o.WriteCode("(" + labelTrue + ")")
+	o.WriteCode("@SP")
+	o.WriteCode("A=M")
+	o.WriteCode("M=-1")
+	o.WriteCode("(" + labelEnd + ")")
+	o.WriteCode("@SP")
+	o.WriteCode("M=M+1")
 }
 
 func (o *Output) WriteCode(command string) {
 	_, _ = o.file.WriteString(command + "\n")
 }
 
-func (o *Output) WritePushPop(cmdType parser.CmdType, command string, arg2 string, fileName string) {
-	switch cmdType {
-	case parser.C_PUSH:
-		switch command {
-		case "constant":
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=A")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "local":
-			o.WriteCode("@LCL")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("A=D")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@LCL")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "argument":
-			o.WriteCode("@ARG")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("A=D")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@ARG")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "this":
-			o.WriteCode("@THIS")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("A=D")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@THIS")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-
-		case "that":
-			o.WriteCode("@THAT")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("A=D")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@THAT")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "temp":
-			o.WriteCode("@R5")
-			o.WriteCode("D=A")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("A=D")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@R5")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "pointer":
-
-			if arg2 == "0" {
-				o.WriteCode("@THIS")
-				o.WriteCode("D=M")
-				o.WriteCode("@SP")
-				o.WriteCode("A=M")
-				o.WriteCode("M=D")
-				o.WriteCode("@SP")
-				o.WriteCode("M=M+1")
-			} else {
-				o.WriteCode("@THAT")
-				o.WriteCode("D=M")
-				o.WriteCode("@SP")
-				o.WriteCode("A=M")
-				o.WriteCode("M=D")
-				o.WriteCode("@SP")
-				o.WriteCode("M=M+1")
-			}
-		case "static":
-			o.WriteCode("@16")
-			o.WriteCode("D=A")
-			o.WriteCode("@" + fileName + "." + arg2)
-			o.WriteCode("A=D+A")
-			o.WriteCode("D=M")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		}
-	case parser.C_POP:
-		switch command {
-
-		case "constant":
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=A")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M+1")
-		case "local":
-			o.WriteCode("@LCL")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		case "argument":
-			o.WriteCode("@ARG")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		case "this":
-			o.WriteCode("@THIS")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		case "that":
-			o.WriteCode("@THAT")
-			o.WriteCode("D=M")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		case "temp":
-			o.WriteCode("@R5")
-			o.WriteCode("D=A")
-			o.WriteCode("@" + arg2)
-			o.WriteCode("D=D+A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		case "pointer":
-			if arg2 == "0" {
-				o.WriteCode("@SP")
-				o.WriteCode("M=M-1")
-				o.WriteCode("@SP")
-				o.WriteCode("A=M")
-				o.WriteCode("D=M")
-				o.WriteCode("M=0")
-				o.WriteCode("@THIS")
-				o.WriteCode("M=D")
-			} else {
-				o.WriteCode("@SP")
-				o.WriteCode("M=M-1")
-				o.WriteCode("@SP")
-				o.WriteCode("A=M")
-				o.WriteCode("D=M")
-				o.WriteCode("M=0")
-				o.WriteCode("@THAT")
-				o.WriteCode("M=D")
-			}
-		case "static":
-			o.WriteCode("@16")
-			o.WriteCode("D=A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D")
-			o.WriteCode("@" + fileName + "." + arg2)
-			o.WriteCode("D=A")
-			o.WriteCode("@R13")
-			o.WriteCode("M=D+M")
-			o.WriteCode("@SP")
-			o.WriteCode("M=M-1")
-			o.WriteCode("@SP")
-			o.WriteCode("A=M")
-			o.WriteCode("D=M")
-			o.WriteCode("M=0")
-			o.WriteCode("@R13")
-			o.WriteCode("A=M")
-			o.WriteCode("M=D")
-			// o.WriteCode("@R13")
-			// o.WriteCode("M=0")
-		}
+func (o *Output) WritePushPop(cmdType parser.CmdType, segment, index, fileName string) {
+	if cmdType == parser.C_PUSH {
+		o.push(segment, index, fileName)
+	} else {
+		o.pop(segment, index, fileName)
 	}
+}
+
+func (o *Output) push(segment, index, fileName string) {
+	switch segment {
+	case "constant":
+		o.WriteCode("@" + index)
+		o.WriteCode("D=A")
+	case "local", "argument", "this", "that":
+		base := map[string]string{
+			"local":    "LCL",
+			"argument": "ARG",
+			"this":     "THIS",
+			"that":     "THAT",
+		}[segment]
+		o.WriteCode("@" + base)
+		o.WriteCode("D=M")
+		o.WriteCode("@" + index)
+		o.WriteCode("A=D+A")
+		o.WriteCode("D=M")
+	case "temp":
+		o.WriteCode("@R5")
+		o.WriteCode("D=A")
+		o.WriteCode("@" + index)
+		o.WriteCode("A=D+A")
+		o.WriteCode("D=M")
+	case "pointer":
+		base := "THIS"
+		if index == "1" {
+			base = "THAT"
+		}
+		o.WriteCode("@" + base)
+		o.WriteCode("D=M")
+	case "static":
+		o.WriteCode("@" + fileName + "." + index)
+		o.WriteCode("D=M")
+	}
+	o.WriteCode("@SP")
+	o.WriteCode("A=M")
+	o.WriteCode("M=D")
+	o.WriteCode("@SP")
+	o.WriteCode("M=M+1")
+}
+
+func (o *Output) pop(segment, index, fileName string) {
+	switch segment {
+	case "local", "argument", "this", "that":
+		base := map[string]string{
+			"local":    "LCL",
+			"argument": "ARG",
+			"this":     "THIS",
+			"that":     "THAT",
+		}[segment]
+		o.WriteCode("@" + base)
+		o.WriteCode("D=M")
+		o.WriteCode("@" + index)
+		o.WriteCode("D=D+A")
+	case "temp":
+		o.WriteCode("@R5")
+		o.WriteCode("D=A")
+		o.WriteCode("@" + index)
+		o.WriteCode("D=D+A")
+	case "pointer":
+		base := "THIS"
+		if index == "1" {
+			base = "THAT"
+		}
+		o.WriteCode("@SP")
+		o.WriteCode("M=M-1")
+		o.WriteCode("A=M")
+		o.WriteCode("D=M")
+		o.WriteCode("@" + base)
+		o.WriteCode("M=D")
+		return
+	case "static":
+		o.WriteCode("@" + fileName + "." + index)
+		o.WriteCode("D=A")
+	}
+	o.WriteCode("@R13")
+	o.WriteCode("M=D")
+	o.WriteCode("@SP")
+	o.WriteCode("M=M-1")
+	o.WriteCode("A=M")
+	o.WriteCode("D=M")
+	o.WriteCode("@R13")
+	o.WriteCode("A=M")
+	o.WriteCode("M=D")
 }
 
 func (o *Output) Close() {
