@@ -386,6 +386,7 @@ func (o *Output) WriteFunction(functionName string, numLocal int) {
 var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 // https://qiita.com/srtkkou/items/ccbddc881d6f3549baf1
+// いつか、重複判定を入れる
 func RandomString() string {
 
 	// r := rand.New(time.Now().UnixNano())
