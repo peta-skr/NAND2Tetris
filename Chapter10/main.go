@@ -1,6 +1,7 @@
 package main
 
 import (
+	jackanalyzer "Chapter10/JackAnalyzer"
 	"fmt"
 	"os"
 )
@@ -15,16 +16,8 @@ func main() {
 		return
 	}
 
-	folerPath := args[1]
+	path := args[1]
 
-	files, err := os.ReadDir(folerPath)
-	if err != nil {
-		fmt.Println("エラー:", err)
-		return
-	}
-
-	for _, file := range files {
-		fmt.Println(file.Name())
-	}
+	jackanalyzer.Analyzer(path)
 
 }
