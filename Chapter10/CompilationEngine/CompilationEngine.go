@@ -2,12 +2,17 @@ package compilationengine
 
 import (
 	jacktokenizer "Chapter10/JackTokenizer"
+	"fmt"
+	"os"
+	"strings"
 )
 
+// Node インターフェース
 type Node interface {
 	isNode()
 }
 
+// ParseTree 構造体
 type ParseTree struct {
 	Nodes []Node
 }
@@ -18,35 +23,36 @@ type ParseNode struct {
 	Children []Node
 }
 
-func (n ParseNode) isNode() {
-}
+func (n ParseNode) isNode() {}
 
-type ClassNode struct {
+type ContainerNode struct {
 	Name     string
 	Children []Node
 }
 
-func (n ClassNode) isNode() {
-}
-
-type ClassVarDecNode struct {
-	Name     string
-	Children []Node
-}
-
-func (n ClassVarDecNode) isNode() {
-}
+func (n ContainerNode) isNode() {}
 
 func (tree *ParseTree) AddNode(node Node) {
 	tree.Nodes = append(tree.Nodes, node)
 }
 
-func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) {
+// エラーチェック関数
+func expectToken(tokenize *jacktokenizer.JackTokenizer, expectedType jacktokenizer.TokenType, expectedValue string) bool {
+	return tokenize.GetTokenType() == expectedType && tokenize.GetTokenValue() == expectedValue
+}
 
+// トークンをノードとして追加するヘルパー関数
+func addTokenNode(tokenize *jacktokenizer.JackTokenizer, parentNode *ContainerNode) {
+	node := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	parentNode.Children = append(parentNode.Children, node)
+	tokenize.Advance()
+}
+
+func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) {
 	parseTree := ParseTree{}
 
+	// トークンを解析してパースツリーを構築
 	for tokenize.HasMoreTokens() {
-		// token := tokenize.GetTokenValue()
 		tokenType := tokenize.GetTokenType()
 
 		switch tokenType {
@@ -54,40 +60,60 @@ func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) {
 			switch tokenize.GetKeyword() {
 			case jacktokenizer.CLASS:
 				parseTree.CompileClass(&tokenize)
-			case jacktokenizer.METHOD:
-			case jacktokenizer.FUNCTION:
-			case jacktokenizer.CONSTRUCTOR:
-			case jacktokenizer.INT:
-			case jacktokenizer.BOOLEAN:
-			case jacktokenizer.CHAR:
-			case jacktokenizer.VOID:
-			case jacktokenizer.VAR:
-			case jacktokenizer.STATIC:
-			case jacktokenizer.FIELD:
-			case jacktokenizer.LET:
-			case jacktokenizer.DO:
-			case jacktokenizer.IF:
-			case jacktokenizer.ELSE:
-			case jacktokenizer.WHILE:
-			case jacktokenizer.RETURN:
-			case jacktokenizer.TRUE:
-			case jacktokenizer.FALSE:
-			case jacktokenizer.NULL:
-			case jacktokenizer.THIS:
 			}
-		case jacktokenizer.IDENTIFIER:
-		case jacktokenizer.INT_CONST:
-		case jacktokenizer.STRING_CONST:
-		case jacktokenizer.SYMBOL:
-
 		}
-
 		tokenize.Advance()
+	}
+
+	// パースツリーを文字列に変換
+	xmlContent := buildXML(parseTree)
+
+	// ファイルに書き込む
+	err := os.WriteFile(outputFile, []byte(xmlContent), 0644)
+	if err != nil {
+		fmt.Println("XMLファイルを作成できませんでした: ", err)
+	}
+}
+
+func buildXML(tree ParseTree) string {
+	var builder strings.Builder
+
+	for _, node := range tree.Nodes {
+		writeNode(&builder, node, 0)
+	}
+
+	return builder.String()
+}
+
+func writeNode(builder *strings.Builder, node Node, indent int) {
+	indentaion := strings.Repeat("  ", indent)
+
+	switch n := node.(type) {
+	case ParseNode:
+		switch n.Type {
+		case jacktokenizer.KEYWORD:
+			builder.WriteString(fmt.Sprintf("%s<keyword> %s </keyword>\r\n", indentaion, n.Value))
+		case jacktokenizer.SYMBOL:
+			builder.WriteString(fmt.Sprintf("%s<symbol> %s </symbol>\r\n", indentaion, n.Value))
+		case jacktokenizer.IDENTIFIER:
+			builder.WriteString(fmt.Sprintf("%s<identifier> %s </identifier>\r\n", indentaion, n.Value))
+		case jacktokenizer.INT_CONST:
+			builder.WriteString(fmt.Sprintf("%s<integerConstant> %s </integerConstant>\r\n", indentaion, n.Value))
+		case jacktokenizer.STRING_CONST:
+			builder.WriteString(fmt.Sprintf("%s<stringConstant> %s </stringConstant>\r\n", indentaion, n.Value))
+		}
+	case ContainerNode:
+		builder.WriteString(fmt.Sprintf("%s<%s>\r\n", indentaion, n.Name))
+		for _, child := range n.Children {
+			writeNode(builder, child, indent+1)
+		}
+		builder.WriteString(fmt.Sprintf("%s</%s>\r\n", indentaion, n.Name))
+
 	}
 }
 
 func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
-	classContentNode := ClassNode{Name: "class", Children: []Node{}}
+	classContentNode := ContainerNode{Name: "class", Children: []Node{}}
 
 	// 'class' キーワード
 	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetKeyword() != jacktokenizer.CLASS && tokenize.GetTokenValue() != "class" {
@@ -134,81 +160,656 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 	p.AddNode(classContentNode)
 }
 
-func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode *ClassNode) {
+func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode) {
+	classVarDecNode := ContainerNode{Name: "classVarDec", Children: []Node{}}
 
-	classVarDecNode := ClassVarDecNode{Name: "classVarDec", Children: []Node{}}
-
-	// 'static' or 'field' キーワード
-	if tokenize.GetTokenType() != jacktokenizer.KEYWORD &&
-		(tokenize.GetKeyword() != jacktokenizer.STATIC &&
-			tokenize.GetTokenValue() != "static") ||
-		(tokenize.GetKeyword() != jacktokenizer.FIELD &&
-			tokenize.GetTokenValue() != "field") {
+	// 'static' または 'field' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "static") && !expectToken(tokenize, jacktokenizer.KEYWORD, "field") {
 		return // エラー
 	}
-	classNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	classVarDecNode.Children = append(classVarDecNode.Children, classNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &classVarDecNode)
 
 	// 型
+	if tokenize.GetTokenType() != jacktokenizer.KEYWORD && tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	addTokenNode(tokenize, &classVarDecNode)
+
+	// 変数名
+	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	addTokenNode(tokenize, &classVarDecNode)
+
+	// ',' または ';' を処理
+	for tokenize.HasMoreTokens() {
+		if expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
+			addTokenNode(tokenize, &classVarDecNode)
+			break
+		}
+
+		if !expectToken(tokenize, jacktokenizer.SYMBOL, ",") {
+			return // エラー
+		}
+		addTokenNode(tokenize, &classVarDecNode)
+
+		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+			return // エラー
+		}
+		addTokenNode(tokenize, &classVarDecNode)
+	}
+
+	classContentNode.Children = append(classContentNode.Children, classVarDecNode)
+}
+
+func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode) {
+	subroutineDecNode := ContainerNode{Name: "subroutineDec", Children: []Node{}}
+
+	fmt.Println("start")
+
+	// 'constructor', 'function', または 'method' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "constructor") &&
+		!expectToken(tokenize, jacktokenizer.KEYWORD, "function") &&
+		!expectToken(tokenize, jacktokenizer.KEYWORD, "method") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineDecNode)
+
+	// 戻り値の型
+	if tokenize.GetTokenType() != jacktokenizer.KEYWORD && tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineDecNode)
+
+	// サブルーチン名
+	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineDecNode)
+
+	// '('
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "(") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineDecNode)
+
+	// パラメータリスト
+	CompileParameterList(tokenize, &subroutineDecNode)
+
+	// ')'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineDecNode)
+
+	// サブルーチン本体
+	subroutineBodyNode := ContainerNode{Name: "subroutineBody", Children: []Node{}}
+
+	// '{'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "{") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineBodyNode)
+
+	// var 宣言
+	for tokenize.GetTokenType() == jacktokenizer.KEYWORD && tokenize.GetKeyword() == jacktokenizer.VAR {
+		CompileVarDec(tokenize, &subroutineBodyNode)
+	}
+
+	fmt.Println(tokenize.GetTokenValue())
+
+	// ステートメント
+	CompileStatements(tokenize, &subroutineBodyNode)
+
+	// '}'
+	fmt.Println("end")
+	fmt.Println(tokenize.GetTokenValue())
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &subroutineBodyNode)
+
+	// サブルーチン本体をサブルーチン宣言ノードに追加
+	subroutineDecNode.Children = append(subroutineDecNode.Children, subroutineBodyNode)
+
+	// クラス内容ノードに追加
+	classContentNode.Children = append(classContentNode.Children, subroutineDecNode)
+}
+
+func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNode *ContainerNode) {
+	parameterListNode := ContainerNode{Name: "parameterList", Children: []Node{}}
+
+	// 引数ある分繰り返す
+	for tokenize.HasMoreTokens() {
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {
+			break
+		}
+
+		// 引数の型
+		if tokenize.GetTokenType() != jacktokenizer.KEYWORD &&
+			(tokenize.GetKeyword() != jacktokenizer.INT &&
+				tokenize.GetTokenValue() != "int") ||
+			(tokenize.GetKeyword() != jacktokenizer.CHAR &&
+				tokenize.GetTokenValue() != "char") ||
+			(tokenize.GetKeyword() != jacktokenizer.BOOLEAN &&
+				tokenize.GetTokenValue() != "boolean") ||
+			(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
+			return // エラー
+		}
+		typeNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		parameterListNode.Children = append(parameterListNode.Children, typeNode)
+		tokenize.Advance()
+
+		// 引数名
+		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+			return // エラー
+		}
+		varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		parameterListNode.Children = append(parameterListNode.Children, varNameNode)
+		tokenize.Advance()
+
+		// ","
+		if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != "," {
+			return // エラー
+		}
+		commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		parameterListNode.Children = append(parameterListNode.Children, commaNode)
+		tokenize.Advance()
+	}
+
+	subroutineDecNode.Children = append(subroutineDecNode.Children, parameterListNode)
+}
+
+func CompileVarDec(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *ContainerNode) {
+	varDecNode := ContainerNode{Name: "varDec", Children: []Node{}}
+
+	// varキーワード
+	if tokenize.GetTokenType() != jacktokenizer.KEYWORD && tokenize.GetTokenValue() != "var" {
+		return // エラー
+	}
+	varNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	varDecNode.Children = append(varDecNode.Children, varNode)
+	tokenize.Advance()
+
+	// 変数の型
 	if tokenize.GetTokenType() != jacktokenizer.KEYWORD &&
 		(tokenize.GetKeyword() != jacktokenizer.INT &&
-			tokenize.GetTokenValue() != "int") ||
-		(tokenize.GetKeyword() != jacktokenizer.CHAR &&
-			tokenize.GetTokenValue() != "char") ||
-		(tokenize.GetKeyword() != jacktokenizer.BOOLEAN &&
-			tokenize.GetTokenValue() != "boolean") ||
+			tokenize.GetKeyword() != jacktokenizer.CHAR &&
+			tokenize.GetKeyword() != jacktokenizer.BOOLEAN) &&
 		(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
 		return // エラー
 	}
+	typeNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	varDecNode.Children = append(varDecNode.Children, typeNode)
+	tokenize.Advance()
+
+	// 変数名
+	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	varDecNode.Children = append(varDecNode.Children, varNameNode)
+	tokenize.Advance()
+
+	// 変数ある分繰り返す
+	for tokenize.HasMoreTokens() {
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ";" {
+			break
+		}
+
+		// ","
+		if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != "," {
+			return // エラー
+		}
+		commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		varDecNode.Children = append(varDecNode.Children, commaNode)
+		tokenize.Advance()
+
+		// 変数名
+		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+			return // エラー
+		}
+
+		varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		varDecNode.Children = append(varDecNode.Children, varNameNode)
+		tokenize.Advance()
+
+	}
+	// ";"
+	if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != ";" {
+		return // エラー
+	}
+	semicolonNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	varDecNode.Children = append(varDecNode.Children, semicolonNode)
+	tokenize.Advance()
+
+	subroutineBodyNode.Children = append(subroutineBodyNode.Children, varDecNode)
 
 }
 
-func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classVarDecNode *ClassNode) {
-	node := ParseNode{Type: jacktokenizer.KEYWORD, Value: tokenize.GetTokenValue(), Children: []Node{}}
+func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *ContainerNode) {
+	if tokenize.GetTokenType() != jacktokenizer.KEYWORD {
+		return
+	}
 
+	statementsNode := ContainerNode{Name: "Statements", Children: []Node{}}
+
+	for tokenize.HasMoreTokens() {
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+			break
+		}
+		switch tokenize.GetTokenValue() {
+		case "let":
+			CompileLet(tokenize, &statementsNode)
+		case "if":
+			CompileIf(tokenize, &statementsNode)
+		case "do":
+			CompileDo(tokenize, &statementsNode)
+		case "while":
+			CompileWhile(tokenize, &statementsNode)
+		case "return":
+			CompileReturn(tokenize, &statementsNode)
+		}
+
+	}
+
+	subroutineBodyNode.Children = append(subroutineBodyNode.Children, statementsNode)
 }
 
-// func CompileParameterList() {
+func CompileDo(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
+	doNode := ContainerNode{Name: "do", Children: []Node{}}
 
-// }
+	// 'do' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "do") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &doNode)
 
-// func CompileVarDec() {
+	// サブルーチン呼び出し
+	// subroutine name or class name or var name
+	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	NameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	doNode.Children = append(doNode.Children, NameNode)
+	tokenize.Advance()
 
-// }
+	// "."
+	if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "." {
+		dotNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		doNode.Children = append(doNode.Children, dotNode)
+		tokenize.Advance()
 
-// func CompileStatements() {
+		// subroutine name
+		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+			return // エラー
+		}
+		subroutineNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		doNode.Children = append(doNode.Children, subroutineNameNode)
+		tokenize.Advance()
+	}
 
-// }
+	// "("
+	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "(" {
+		return // エラー
+	}
+	openParenNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	doNode.Children = append(doNode.Children, openParenNode)
+	tokenize.Advance()
 
-// func CompileDo() {
+	// expressionList
+	CompileExpressionList(tokenize, &doNode)
 
-// }
+	// ")"
+	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != ")" {
+		return // エラー
+	}
+	closeParenNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	doNode.Children = append(doNode.Children, closeParenNode)
+	tokenize.Advance()
 
-// func CompileLet() {
+	// ';'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &doNode)
 
-// }
+	statementsNode.Children = append(statementsNode.Children, doNode)
+}
 
-// func CompileWhile() {
+func CompileLet(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
+	letNode := ContainerNode{Name: "let", Children: []Node{}}
 
-// }
+	// 'let' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "let") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &letNode)
 
-// func CompileReturn() {
+	// 変数名
+	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+		return // エラー
+	}
+	addTokenNode(tokenize, &letNode)
 
-// }
+	// 配列アクセスの場合
+	if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "[" {
+		addTokenNode(tokenize, &letNode) // '['
+		CompileExpression(tokenize, &letNode)
+		if !expectToken(tokenize, jacktokenizer.SYMBOL, "]") {
+			return // エラー
+		}
+		addTokenNode(tokenize, &letNode) // ']'
+	}
 
-// func CompileIf() {
+	// '='
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "=") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &letNode)
 
-// }
+	// 式
+	CompileExpression(tokenize, &letNode)
 
-// func CompileExpression() {
+	// ';'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &letNode)
 
-// }
+	// 'let' ノードをステートメントノードに追加
+	statementsNode.Children = append(statementsNode.Children, letNode)
+}
 
-// func CompileTerm() {
+func CompileWhile(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
+	whileNode := ContainerNode{Name: "while", Children: []Node{}}
 
-// }
+	// 'while' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "while") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &whileNode)
 
-// func CompileExpressionList() {
+	// '('
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "(") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &whileNode)
 
-// }
+	// 式
+	CompileExpression(tokenize, &whileNode)
+
+	// ')'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &whileNode)
+
+	// '{'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "{") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &whileNode)
+
+	// statements
+	CompileStatements(tokenize, &whileNode)
+
+	// '}'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &whileNode)
+
+	statementsNode.Children = append(statementsNode.Children, whileNode)
+}
+
+func CompileReturn(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
+	returnNode := ContainerNode{Name: "return", Children: []Node{}}
+
+	// 'return' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "return") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &returnNode)
+
+	// 式 (オプション)
+	if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != ";" {
+		CompileExpression(tokenize, &returnNode)
+	}
+
+	// ';'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &returnNode)
+
+	statementsNode.Children = append(statementsNode.Children, returnNode)
+}
+
+func CompileIf(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
+	ifNode := ContainerNode{Name: "if", Children: []Node{}}
+
+	// 'if' キーワード
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "if") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &ifNode)
+
+	// '('
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "(") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &ifNode)
+
+	// 式
+	CompileExpression(tokenize, &ifNode)
+
+	// ')'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &ifNode)
+
+	// '{'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "{") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &ifNode)
+
+	// statements
+	CompileStatements(tokenize, &ifNode)
+
+	// '}'
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
+		return // エラー
+	}
+	addTokenNode(tokenize, &ifNode)
+
+	// 'else' (オプション)
+	if tokenize.GetTokenType() == jacktokenizer.KEYWORD && tokenize.GetTokenValue() == "else" {
+		addTokenNode(tokenize, &ifNode)
+
+		// '{'
+		if !expectToken(tokenize, jacktokenizer.SYMBOL, "{") {
+			return // エラー
+		}
+		addTokenNode(tokenize, &ifNode)
+
+		// statements
+		CompileStatements(tokenize, &ifNode)
+
+		// '}'
+		if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
+			return // エラー
+		}
+		addTokenNode(tokenize, &ifNode)
+	}
+
+	statementsNode.Children = append(statementsNode.Children, ifNode)
+}
+
+func CompileExpression(tokenize *jacktokenizer.JackTokenizer, parentNode *ContainerNode) {
+	expressionNode := ContainerNode{Name: "expression", Children: []Node{}}
+
+	// 最初の term をコンパイル
+	CompileTerm(tokenize, &expressionNode)
+
+	// (op term)* を処理
+	for tokenize.HasMoreTokens() {
+		// 演算子をチェック
+		if tokenize.GetTokenType() != jacktokenizer.SYMBOL || !isOperator(tokenize.GetTokenValue()) {
+			break
+		}
+
+		// 演算子をノードに追加
+		addTokenNode(tokenize, &expressionNode)
+
+		// 次の term をコンパイル
+		CompileTerm(tokenize, &expressionNode)
+	}
+
+	// 完成した expression ノードを親ノードに追加
+	parentNode.Children = append(parentNode.Children, expressionNode)
+}
+
+// 演算子かどうかを判定するヘルパー関数
+func isOperator(token string) bool {
+	operators := []string{"+", "-", "*", "/", "&", "|", "<", ">", "="}
+	for _, op := range operators {
+		if token == op {
+			return true
+		}
+	}
+	return false
+}
+
+func CompileTerm(tokenize *jacktokenizer.JackTokenizer, parentNode *ContainerNode) {
+	termNode := ContainerNode{Name: "term", Children: []Node{}}
+
+	switch tokenize.GetTokenType() {
+	case jacktokenizer.INT_CONST:
+		// 整数定数
+		addTokenNode(tokenize, &termNode)
+
+	case jacktokenizer.STRING_CONST:
+		// 文字列定数
+		addTokenNode(tokenize, &termNode)
+
+	case jacktokenizer.KEYWORD:
+		// キーワード定数 (true, false, null, this)
+		if isKeywordConstant(tokenize.GetTokenValue()) {
+			addTokenNode(tokenize, &termNode)
+		} else {
+			return // エラー
+		}
+
+	case jacktokenizer.IDENTIFIER:
+		// 変数名またはサブルーチン呼び出し
+		addTokenNode(tokenize, &termNode)
+
+		// 配列アクセスまたはサブルーチン呼び出しを処理
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL {
+			switch tokenize.GetTokenValue() {
+			case "[":
+				// 配列アクセス
+				addTokenNode(tokenize, &termNode) // '['
+				CompileExpression(tokenize, &termNode)
+				if !expectToken(tokenize, jacktokenizer.SYMBOL, "]") {
+					return // エラー
+				}
+				addTokenNode(tokenize, &termNode) // ']'
+
+			case "(":
+				// サブルーチン呼び出し (引数なし)
+				addTokenNode(tokenize, &termNode) // '('
+				CompileExpressionList(tokenize, &termNode)
+				if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+					return // エラー
+				}
+				addTokenNode(tokenize, &termNode) // ')'
+
+			case ".":
+				// サブルーチン呼び出し (クラス名または変数名付き)
+				addTokenNode(tokenize, &termNode) // '.'
+				if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
+					return // エラー
+				}
+				addTokenNode(tokenize, &termNode) // サブルーチン名
+				if !expectToken(tokenize, jacktokenizer.SYMBOL, "(") {
+					return // エラー
+				}
+				addTokenNode(tokenize, &termNode) // '('
+				CompileExpressionList(tokenize, &termNode)
+				if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+					return // エラー
+				}
+				addTokenNode(tokenize, &termNode) // ')'
+			}
+		}
+
+	case jacktokenizer.SYMBOL:
+		switch tokenize.GetTokenValue() {
+		case "(":
+			// 括弧で囲まれた式
+			addTokenNode(tokenize, &termNode) // '('
+			CompileExpression(tokenize, &termNode)
+			if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
+				return // エラー
+			}
+			addTokenNode(tokenize, &termNode) // ')'
+
+		case "-", "~":
+			// 単項演算子
+			addTokenNode(tokenize, &termNode) // 単項演算子
+			CompileTerm(tokenize, &termNode)
+
+		default:
+			return // エラー
+		}
+
+	default:
+		return // エラー
+	}
+
+	// 完成した term ノードを親ノードに追加
+	parentNode.Children = append(parentNode.Children, termNode)
+}
+
+// キーワード定数かどうかを判定するヘルパー関数
+func isKeywordConstant(token string) bool {
+	keywords := []string{"true", "false", "null", "this"}
+	for _, kw := range keywords {
+		if token == kw {
+			return true
+		}
+	}
+	return false
+}
+
+func CompileExpressionList(tokenize *jacktokenizer.JackTokenizer, doNode *ContainerNode) {
+	expressionListNode := ContainerNode{Name: "expressionList", Children: []Node{}}
+
+	// 式がある分繰り返す
+	for tokenize.HasMoreTokens() {
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {
+			break
+		}
+
+		// 式
+		CompileExpression(tokenize, &expressionListNode)
+
+		// ","
+		if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "," {
+			if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {
+				break
+			} else {
+				return // エラー
+			}
+		}
+		commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+		expressionListNode.Children = append(expressionListNode.Children, commaNode)
+		tokenize.Advance()
+	}
+
+	doNode.Children = append(doNode.Children, expressionListNode)
+}

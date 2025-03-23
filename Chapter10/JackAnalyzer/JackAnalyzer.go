@@ -1,6 +1,7 @@
 package jackanalyzer
 
 import (
+	compilationengine "Chapter10/CompilationEngine"
 	jacktokenizer "Chapter10/JackTokenizer"
 	"fmt"
 	"os"
@@ -41,36 +42,37 @@ func Analyzer(source string) {
 
 func Analyze(source string) {
 	tokenizer := jacktokenizer.Tokenizer(source)
+	xmlFilePath := source[:len(source)-5] + "_test.xml" // test用
+	compilationengine.Compile(*tokenizer, xmlFilePath)
 
-	xmlFilePath := source[:len(source)-5] + "T_test.xml" // test用
-	xmlFile, err := os.Create(xmlFilePath)
-	if err != nil {
-		fmt.Println("XMLファイルを作成できませんでした: ", err)
-		return
-	}
-	defer xmlFile.Close()
+	// xmlFile, err := os.Create(xmlFilePath)
+	// if err != nil {
+	// 	fmt.Println("XMLファイルを作成できませんでした: ", err)
+	// 	return
+	// }
+	// defer xmlFile.Close()
 
-	// ファイルにトークンを書き込んでいく
-	xmlFile.WriteString("<tokens>\r\n")
+	// // ファイルにトークンを書き込んでいく
+	// xmlFile.WriteString("<tokens>\r\n")
 
-	for tokenizer.HasMoreTokens() {
-		token := tokenizer.GetTokenValue()
-		tokenType := tokenizer.GetTokenType()
-		switch tokenType {
-		case jacktokenizer.KEYWORD:
-			xmlFile.WriteString("<keyword> " + token + " </keyword>\r\n")
-		case jacktokenizer.SYMBOL:
-			xmlFile.WriteString("<symbol> " + token + " </symbol>\r\n")
-		case jacktokenizer.IDENTIFIER:
-			xmlFile.WriteString("<identifier> " + token + " </identifier>\r\n")
-		case jacktokenizer.INT_CONST:
-			xmlFile.WriteString("<integerConstant> " + token + " </integerConstant>\r\n")
-		case jacktokenizer.STRING_CONST:
-			xmlFile.WriteString("<stringConstant> " + token + " </stringConstant>\r\n")
-		}
-		tokenizer.Advance()
-	}
+	// for tokenizer.HasMoreTokens() {
+	// 	token := tokenizer.GetTokenValue()
+	// 	tokenType := tokenizer.GetTokenType()
+	// 	switch tokenType {
+	// 	case jacktokenizer.KEYWORD:
+	// 		xmlFile.WriteString("<keyword> " + token + " </keyword>\r\n")
+	// 	case jacktokenizer.SYMBOL:
+	// 		xmlFile.WriteString("<symbol> " + token + " </symbol>\r\n")
+	// 	case jacktokenizer.IDENTIFIER:
+	// 		xmlFile.WriteString("<identifier> " + token + " </identifier>\r\n")
+	// 	case jacktokenizer.INT_CONST:
+	// 		xmlFile.WriteString("<integerConstant> " + token + " </integerConstant>\r\n")
+	// 	case jacktokenizer.STRING_CONST:
+	// 		xmlFile.WriteString("<stringConstant> " + token + " </stringConstant>\r\n")
+	// 	}
+	// 	tokenizer.Advance()
+	// }
 
-	xmlFile.WriteString("</tokens>\r\n")
+	// xmlFile.WriteString("</tokens>\r\n")
 
 }
