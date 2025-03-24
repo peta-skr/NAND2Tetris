@@ -1,6 +1,7 @@
 package jackanalyzer
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -20,9 +21,12 @@ func TestTokenizer(t *testing.T) {
 				Analyze(path)
 
 				// 生成されたXMLファイルのパス
-				generatedXMLPath := path[:len(path)-5] + "T_test.xml"
+				generatedXMLPath := path[:len(path)-5] + "_test.xml"
 				// 期待されるXMLファイルのパス
-				expectedXMLPath := path[:len(path)-5] + "T.xml"
+				expectedXMLPath := path[:len(path)-5] + ".xml"
+
+				fmt.Println(generatedXMLPath)
+				fmt.Println(expectedXMLPath)
 
 				// 生成されたXMLファイルを読み込む
 				generatedXML, err := os.ReadFile(generatedXMLPath)

@@ -141,9 +141,9 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 
 	for tokenize.HasMoreTokens() {
 		tokenType := tokenize.GetTokenType()
-		if tokenType == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
-			break
-		}
+		// if tokenType == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+		// 	break
+		// }
 
 		switch tokenType {
 		case jacktokenizer.KEYWORD:
@@ -154,8 +154,19 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 				CompileSubroutine(tokenize, &classContentNode)
 			}
 		}
+		tokenType = tokenize.GetTokenType()
+		if tokenType == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+			break
+		}
 		tokenize.Advance()
 	}
+
+	// '}' シンボル
+	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "{" {
+		return // エラー
+	}
+	closeBraceNode := ParseNode{Type: jacktokenizer.SYMBOL, Value: "}"}
+	classContentNode.Children = append(classContentNode.Children, closeBraceNode)
 
 	p.AddNode(classContentNode)
 }
@@ -204,8 +215,6 @@ func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode 
 
 func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode) {
 	subroutineDecNode := ContainerNode{Name: "subroutineDec", Children: []Node{}}
-
-	fmt.Println("start")
 
 	// 'constructor', 'function', または 'method' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "constructor") &&
@@ -256,14 +265,10 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 		CompileVarDec(tokenize, &subroutineBodyNode)
 	}
 
-	fmt.Println(tokenize.GetTokenValue())
-
 	// ステートメント
 	CompileStatements(tokenize, &subroutineBodyNode)
 
 	// '}'
-	fmt.Println("end")
-	fmt.Println(tokenize.GetTokenValue())
 	if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
 		return // エラー
 	}
@@ -392,7 +397,7 @@ func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode
 		return
 	}
 
-	statementsNode := ContainerNode{Name: "Statements", Children: []Node{}}
+	statementsNode := ContainerNode{Name: "statements", Children: []Node{}}
 
 	for tokenize.HasMoreTokens() {
 		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
@@ -417,7 +422,7 @@ func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode
 }
 
 func CompileDo(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
-	doNode := ContainerNode{Name: "do", Children: []Node{}}
+	doNode := ContainerNode{Name: "doStatement", Children: []Node{}}
 
 	// 'do' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "do") {
@@ -478,7 +483,7 @@ func CompileDo(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerN
 }
 
 func CompileLet(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
-	letNode := ContainerNode{Name: "let", Children: []Node{}}
+	letNode := ContainerNode{Name: "letStatement", Children: []Node{}}
 
 	// 'let' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "let") {
@@ -522,7 +527,7 @@ func CompileLet(tokenize *jacktokenizer.JackTokenizer, statementsNode *Container
 }
 
 func CompileWhile(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
-	whileNode := ContainerNode{Name: "while", Children: []Node{}}
+	whileNode := ContainerNode{Name: "whileStatement", Children: []Node{}}
 
 	// 'while' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "while") {
@@ -564,7 +569,7 @@ func CompileWhile(tokenize *jacktokenizer.JackTokenizer, statementsNode *Contain
 }
 
 func CompileReturn(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
-	returnNode := ContainerNode{Name: "return", Children: []Node{}}
+	returnNode := ContainerNode{Name: "returnStatement", Children: []Node{}}
 
 	// 'return' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "return") {
@@ -587,7 +592,7 @@ func CompileReturn(tokenize *jacktokenizer.JackTokenizer, statementsNode *Contai
 }
 
 func CompileIf(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerNode) {
-	ifNode := ContainerNode{Name: "if", Children: []Node{}}
+	ifNode := ContainerNode{Name: "ifStatement", Children: []Node{}}
 
 	// 'if' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "if") {
@@ -674,7 +679,7 @@ func CompileExpression(tokenize *jacktokenizer.JackTokenizer, parentNode *Contai
 
 // 演算子かどうかを判定するヘルパー関数
 func isOperator(token string) bool {
-	operators := []string{"+", "-", "*", "/", "&", "|", "<", ">", "="}
+	operators := []string{"+", "-", "*", "/", "&amp;", "|", "&gt;", "&lt;", "="}
 	for _, op := range operators {
 		if token == op {
 			return true
@@ -799,7 +804,7 @@ func CompileExpressionList(tokenize *jacktokenizer.JackTokenizer, doNode *Contai
 		CompileExpression(tokenize, &expressionListNode)
 
 		// ","
-		if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "," {
+		if tokenize.GetTokenValue() != "," {
 			if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {
 				break
 			} else {
