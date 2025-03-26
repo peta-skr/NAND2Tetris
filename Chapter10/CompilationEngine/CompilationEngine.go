@@ -141,9 +141,10 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 
 	for tokenize.HasMoreTokens() {
 		tokenType := tokenize.GetTokenType()
-		// if tokenType == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
-		// 	break
-		// }
+		// '}' を検出したら終了
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+			break
+		}
 
 		switch tokenType {
 		case jacktokenizer.KEYWORD:
@@ -152,21 +153,19 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 				CompileClassVarDec(tokenize, &classContentNode)
 			case jacktokenizer.METHOD, jacktokenizer.FUNCTION, jacktokenizer.CONSTRUCTOR:
 				CompileSubroutine(tokenize, &classContentNode)
+			default:
+				return
 			}
+		default:
+			return
 		}
-		tokenType = tokenize.GetTokenType()
-		if tokenType == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
-			break
-		}
-		tokenize.Advance()
 	}
 
-	// '}' シンボル
+	// // '}' シンボル
 	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "{" {
 		return // エラー
 	}
-	closeBraceNode := ParseNode{Type: jacktokenizer.SYMBOL, Value: "}"}
-	classContentNode.Children = append(classContentNode.Children, closeBraceNode)
+	addTokenNode(tokenize, &classContentNode)
 
 	p.AddNode(classContentNode)
 }
@@ -196,6 +195,8 @@ func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode 
 	for tokenize.HasMoreTokens() {
 		if expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
 			addTokenNode(tokenize, &classVarDecNode)
+			// node := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+			// classVarDecNode.Children = append(classVarDecNode.Children, node)
 			break
 		}
 
@@ -273,12 +274,15 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 		return // エラー
 	}
 	addTokenNode(tokenize, &subroutineBodyNode)
+	// node := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+	// subroutineBodyNode.Children = append(subroutineBodyNode.Children, node)
 
 	// サブルーチン本体をサブルーチン宣言ノードに追加
 	subroutineDecNode.Children = append(subroutineDecNode.Children, subroutineBodyNode)
 
 	// クラス内容ノードに追加
 	classContentNode.Children = append(classContentNode.Children, subroutineDecNode)
+
 }
 
 func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNode *ContainerNode) {
@@ -293,11 +297,8 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 		// 引数の型
 		if tokenize.GetTokenType() != jacktokenizer.KEYWORD &&
 			(tokenize.GetKeyword() != jacktokenizer.INT &&
-				tokenize.GetTokenValue() != "int") ||
-			(tokenize.GetKeyword() != jacktokenizer.CHAR &&
-				tokenize.GetTokenValue() != "char") ||
-			(tokenize.GetKeyword() != jacktokenizer.BOOLEAN &&
-				tokenize.GetTokenValue() != "boolean") ||
+				tokenize.GetKeyword() != jacktokenizer.CHAR &&
+				tokenize.GetKeyword() != jacktokenizer.BOOLEAN) &&
 			(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
 			return // エラー
 		}
@@ -314,12 +315,11 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 		tokenize.Advance()
 
 		// ","
-		if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != "," {
-			return // エラー
+		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "," {
+			commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
+			parameterListNode.Children = append(parameterListNode.Children, commaNode)
+			tokenize.Advance()
 		}
-		commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		parameterListNode.Children = append(parameterListNode.Children, commaNode)
-		tokenize.Advance()
 	}
 
 	subroutineDecNode.Children = append(subroutineDecNode.Children, parameterListNode)
@@ -393,9 +393,9 @@ func CompileVarDec(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *Co
 }
 
 func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *ContainerNode) {
-	if tokenize.GetTokenType() != jacktokenizer.KEYWORD {
-		return
-	}
+	// if tokenize.GetTokenType() != jacktokenizer.KEYWORD {
+	// 	return
+	// }
 
 	statementsNode := ContainerNode{Name: "statements", Children: []Node{}}
 
