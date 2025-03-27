@@ -116,12 +116,10 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 	classContentNode := ContainerNode{Name: "class", Children: []Node{}}
 
 	// 'class' キーワード
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetKeyword() != jacktokenizer.CLASS && tokenize.GetTokenValue() != "class" {
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "class") {
 		return // エラー
 	}
-	classNode := ParseNode{Type: jacktokenizer.KEYWORD, Value: "class"}
-	classContentNode.Children = append(classContentNode.Children, classNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &classContentNode)
 
 	// クラス名
 	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
@@ -132,17 +130,15 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 	tokenize.Advance()
 
 	// '{' シンボル
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "{" {
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "{") {
 		return // エラー
 	}
-	openBraceNode := ParseNode{Type: jacktokenizer.SYMBOL, Value: "{"}
-	classContentNode.Children = append(classContentNode.Children, openBraceNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &classContentNode)
 
 	for tokenize.HasMoreTokens() {
 		tokenType := tokenize.GetTokenType()
 		// '}' を検出したら終了
-		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+		if expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
 			break
 		}
 
@@ -162,7 +158,7 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer) {
 	}
 
 	// // '}' シンボル
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "{" {
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
 		return // エラー
 	}
 	addTokenNode(tokenize, &classContentNode)
@@ -195,8 +191,6 @@ func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode 
 	for tokenize.HasMoreTokens() {
 		if expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
 			addTokenNode(tokenize, &classVarDecNode)
-			// node := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-			// classVarDecNode.Children = append(classVarDecNode.Children, node)
 			break
 		}
 
@@ -274,8 +268,6 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 		return // エラー
 	}
 	addTokenNode(tokenize, &subroutineBodyNode)
-	// node := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	// subroutineBodyNode.Children = append(subroutineBodyNode.Children, node)
 
 	// サブルーチン本体をサブルーチン宣言ノードに追加
 	subroutineDecNode.Children = append(subroutineDecNode.Children, subroutineBodyNode)
@@ -290,7 +282,7 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 
 	// 引数ある分繰り返す
 	for tokenize.HasMoreTokens() {
-		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {
+		if expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
 			break
 		}
 
@@ -302,23 +294,17 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 			(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
 			return // エラー
 		}
-		typeNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		parameterListNode.Children = append(parameterListNode.Children, typeNode)
-		tokenize.Advance()
+		addTokenNode(tokenize, &parameterListNode)
 
 		// 引数名
 		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 			return // エラー
 		}
-		varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		parameterListNode.Children = append(parameterListNode.Children, varNameNode)
-		tokenize.Advance()
+		addTokenNode(tokenize, &parameterListNode)
 
 		// ","
-		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "," {
-			commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-			parameterListNode.Children = append(parameterListNode.Children, commaNode)
-			tokenize.Advance()
+		if expectToken(tokenize, jacktokenizer.SYMBOL, ",") {
+			addTokenNode(tokenize, &parameterListNode)
 		}
 	}
 
@@ -329,12 +315,10 @@ func CompileVarDec(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *Co
 	varDecNode := ContainerNode{Name: "varDec", Children: []Node{}}
 
 	// varキーワード
-	if tokenize.GetTokenType() != jacktokenizer.KEYWORD && tokenize.GetTokenValue() != "var" {
+	if !expectToken(tokenize, jacktokenizer.KEYWORD, "var") {
 		return // エラー
 	}
-	varNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	varDecNode.Children = append(varDecNode.Children, varNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &varDecNode)
 
 	// 変数の型
 	if tokenize.GetTokenType() != jacktokenizer.KEYWORD &&
@@ -344,63 +328,49 @@ func CompileVarDec(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *Co
 		(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
 		return // エラー
 	}
-	typeNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	varDecNode.Children = append(varDecNode.Children, typeNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &varDecNode)
 
 	// 変数名
 	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 		return // エラー
 	}
-	varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	varDecNode.Children = append(varDecNode.Children, varNameNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &varDecNode)
 
 	// 変数ある分繰り返す
 	for tokenize.HasMoreTokens() {
-		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ";" {
+		if expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
 			break
 		}
 
 		// ","
-		if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != "," {
+		if !expectToken(tokenize, jacktokenizer.SYMBOL, ",") {
 			return // エラー
 		}
-		commaNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		varDecNode.Children = append(varDecNode.Children, commaNode)
-		tokenize.Advance()
+		addTokenNode(tokenize, &varDecNode)
 
 		// 変数名
 		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 			return // エラー
 		}
-
-		varNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		varDecNode.Children = append(varDecNode.Children, varNameNode)
-		tokenize.Advance()
+		addTokenNode(tokenize, &varDecNode)
 
 	}
 	// ";"
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL || tokenize.GetTokenValue() != ";" {
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
 		return // エラー
 	}
-	semicolonNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	varDecNode.Children = append(varDecNode.Children, semicolonNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &varDecNode)
 
 	subroutineBodyNode.Children = append(subroutineBodyNode.Children, varDecNode)
 
 }
 
 func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *ContainerNode) {
-	// if tokenize.GetTokenType() != jacktokenizer.KEYWORD {
-	// 	return
-	// }
 
 	statementsNode := ContainerNode{Name: "statements", Children: []Node{}}
 
 	for tokenize.HasMoreTokens() {
-		if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "}" {
+		if expectToken(tokenize, jacktokenizer.SYMBOL, "}") {
 			break
 		}
 		switch tokenize.GetTokenValue() {
@@ -431,47 +401,36 @@ func CompileDo(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerN
 	addTokenNode(tokenize, &doNode)
 
 	// サブルーチン呼び出し
-	// subroutine name or class name or var name
 	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 		return // エラー
 	}
-	NameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	doNode.Children = append(doNode.Children, NameNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &doNode)
 
 	// "."
-	if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "." {
-		dotNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		doNode.Children = append(doNode.Children, dotNode)
-		tokenize.Advance()
+	if expectToken(tokenize, jacktokenizer.SYMBOL, ".") {
+		addTokenNode(tokenize, &doNode)
 
 		// subroutine name
 		if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 			return // エラー
 		}
-		subroutineNameNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-		doNode.Children = append(doNode.Children, subroutineNameNode)
-		tokenize.Advance()
+		addTokenNode(tokenize, &doNode)
 	}
 
 	// "("
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != "(" {
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, "(") {
 		return // エラー
 	}
-	openParenNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	doNode.Children = append(doNode.Children, openParenNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &doNode)
 
 	// expressionList
 	CompileExpressionList(tokenize, &doNode)
 
 	// ")"
-	if tokenize.GetTokenType() != jacktokenizer.SYMBOL && tokenize.GetTokenValue() != ")" {
+	if !expectToken(tokenize, jacktokenizer.SYMBOL, ")") {
 		return // エラー
 	}
-	closeParenNode := ParseNode{Type: tokenize.GetTokenType(), Value: tokenize.GetTokenValue()}
-	doNode.Children = append(doNode.Children, closeParenNode)
-	tokenize.Advance()
+	addTokenNode(tokenize, &doNode)
 
 	// ';'
 	if !expectToken(tokenize, jacktokenizer.SYMBOL, ";") {
@@ -498,7 +457,7 @@ func CompileLet(tokenize *jacktokenizer.JackTokenizer, statementsNode *Container
 	addTokenNode(tokenize, &letNode)
 
 	// 配列アクセスの場合
-	if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == "[" {
+	if expectToken(tokenize, jacktokenizer.SYMBOL, "[") {
 		addTokenNode(tokenize, &letNode) // '['
 		CompileExpression(tokenize, &letNode)
 		if !expectToken(tokenize, jacktokenizer.SYMBOL, "]") {
@@ -631,7 +590,7 @@ func CompileIf(tokenize *jacktokenizer.JackTokenizer, statementsNode *ContainerN
 	addTokenNode(tokenize, &ifNode)
 
 	// 'else' (オプション)
-	if tokenize.GetTokenType() == jacktokenizer.KEYWORD && tokenize.GetTokenValue() == "else" {
+	if expectToken(tokenize, jacktokenizer.KEYWORD, "else") {
 		addTokenNode(tokenize, &ifNode)
 
 		// '{'
