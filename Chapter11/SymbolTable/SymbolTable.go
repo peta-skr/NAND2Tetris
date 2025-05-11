@@ -78,8 +78,6 @@ func (s *SymbolTable) EndSubroutine() {
 
 func (s *SymbolTable) Define(name string, varType string, kind string) {
 	// 変数を定義する
-	fmt.Println("Define:", name, varType, kind)
-
 	if s.CurrentScope == CLASS_SCOPE {
 		// クラススコープの場合
 		if _, ok := s.ClassSymbolTable[name]; !ok {
@@ -133,9 +131,10 @@ func (s *SymbolTable) Define(name string, varType string, kind string) {
 		fmt.Println("エラー: 定義できない変数の種類です")
 		return // エラー処理
 	}
+
 }
 
-func (s *SymbolTable) VarCount(kind string) int {
+func (s *SymbolTable) VarCount(tableName string, kind string) int {
 	if s.CurrentScope == CLASS_SCOPE {
 		switch kind {
 		case STATIC:
@@ -148,16 +147,32 @@ func (s *SymbolTable) VarCount(kind string) int {
 	} else {
 		switch kind {
 		case ARG:
-			return subroutine_argCount
+			table := s.SubroutineSymbolTables[tableName]
+			// count := 0
+			// for _, i := range table {
+			// 	fmt.Println("this: ", i)
+			// 	if i["kind"] == ARG {
+			// 		count++
+			// 	}
+			// }
+			return len(table)
 		case VAR:
-			return subroutine_varCount
+			table := s.SubroutineSymbolTables[tableName]
+			count := 0
+			for _, i := range table {
+				fmt.Println("this: ", i)
+				if i["kind"] == VAR {
+					count++
+				}
+			}
+			return count
 		default:
 			return -1 // エラー処理
 		}
 	}
 }
 
-func (s *SymbolTable) KindOf(name string) string {
+func (s *SymbolTable) KindOf(scopeName string, name string) string {
 
 	if s.CurrentScope == CLASS_SCOPE {
 		if _, ok := s.ClassSymbolTable[name]; ok {
@@ -166,15 +181,15 @@ func (s *SymbolTable) KindOf(name string) string {
 			return NONE
 		}
 	} else {
-		if _, ok := s.SubroutineSymbolTable[name]; ok {
-			return s.SubroutineSymbolTable[name]["kind"]
+		if table, ok := s.SubroutineSymbolTables[scopeName]; ok {
+			return table[name]["kind"]
 		} else {
 			return NONE
 		}
 	}
 }
 
-func (s *SymbolTable) TypeOf(name string) string {
+func (s *SymbolTable) TypeOf(scopeName string, name string) string {
 	if s.CurrentScope == CLASS_SCOPE {
 		if _, ok := s.ClassSymbolTable[name]; ok {
 			return s.ClassSymbolTable[name]["type"]
@@ -182,8 +197,8 @@ func (s *SymbolTable) TypeOf(name string) string {
 			return NONE
 		}
 	} else {
-		if _, ok := s.SubroutineSymbolTable[name]; ok {
-			return s.SubroutineSymbolTable[name]["type"]
+		if table, ok := s.SubroutineSymbolTables[scopeName]; ok {
+			return table[name]["type"]
 		} else {
 			return NONE
 		}

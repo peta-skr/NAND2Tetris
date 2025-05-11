@@ -45,7 +45,6 @@ func Analyze(source string) {
 	tokenizer := jacktokenizer.Tokenizer(source)
 	vmFilePath := source[:len(source)-5] + ".vm"
 	parseTree, symboltable := compilationengine.Compile(*tokenizer, vmFilePath)
-	fmt.Println("parseTree:", parseTree)
 	fmt.Println("symboltable:", symboltable)
 
 	codegenerator.GenerateCode(parseTree, symboltable, vmFilePath)

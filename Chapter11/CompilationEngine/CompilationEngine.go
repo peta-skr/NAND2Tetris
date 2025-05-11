@@ -3,6 +3,7 @@ package compilationengine
 import (
 	jacktokenizer "Chapter11/JackTokenizer"
 	Symboltable "Chapter11/SymbolTable"
+	"fmt"
 )
 
 // Node インターフェース
@@ -305,7 +306,7 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 	addTokenNode(tokenize, &subroutineBodyNode)
 
 	// var 宣言
-	for tokenize.GetTokenType() == jacktokenizer.KEYWORD && tokenize.GetKeyword() == jacktokenizer.VAR {
+	for tokenize.GetTokenType() == jacktokenizer.KEYWORD && tokenize.GetTokenValue() == "var" {
 		CompileVarDec(tokenize, &subroutineBodyNode, symboltable)
 	}
 
@@ -346,6 +347,7 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 			(tokenize.GetTokenType() != jacktokenizer.IDENTIFIER) {
 			return // エラー
 		}
+
 		argType := tokenize.GetTokenValue()
 		addTokenNode(tokenize, &parameterListNode)
 
@@ -363,6 +365,7 @@ func CompileParameterList(tokenize *jacktokenizer.JackTokenizer, subroutineDecNo
 	}
 
 	subroutineDecNode.Children = append(subroutineDecNode.Children, parameterListNode)
+
 }
 
 func CompileVarDec(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode *ContainerNode, symboltable *Symboltable.SymbolTable) {
@@ -441,6 +444,10 @@ func CompileStatements(tokenize *jacktokenizer.JackTokenizer, subroutineBodyNode
 			CompileWhile(tokenize, &statementsNode, symboltable)
 		case "return":
 			CompileReturn(tokenize, &statementsNode, symboltable)
+		default:
+			// 何もしない
+			fmt.Println("default:" + tokenize.GetTokenValue())
+			return
 		}
 
 	}
@@ -818,6 +825,8 @@ func CompileExpressionList(tokenize *jacktokenizer.JackTokenizer, doNode *Contai
 
 		// 式
 		CompileExpression(tokenize, &expressionListNode, symboltable)
+
+		fmt.Println("expressionListNode.Children:", expressionListNode.Children)
 
 		// ","
 		if tokenize.GetTokenValue() != "," {

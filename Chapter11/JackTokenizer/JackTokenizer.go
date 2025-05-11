@@ -161,12 +161,19 @@ func Tokenizer(source string) *JackTokenizer {
 				}
 				tokens = append(tokens, Token{Type: STRING_CONST, Value: stringToken})
 			default:
-				value := str
+				// value := str
+				value := ""
+
+				if !isSymbol(str) && str != " " && str != "\t" && str != "\n" && str != "\r" {
+					value += str
+				}
+
 				for {
 					index++
 					if index < len(arr) {
 						str = arr[index]
-						if isSymbol(str) || str == " " {
+						if isSymbol(str) || str == " " || str == "\t" || str == "\n" || str == "\r" {
+							// if isSymbol(str) || unicode.IsSpace(rune(str[0])) {
 							index-- // シンボルやスペースに出会ったらインデックスを戻す
 							break
 						}
@@ -178,7 +185,9 @@ func Tokenizer(source string) *JackTokenizer {
 				if isKeyword(value) {
 					tokens = append(tokens, Token{Type: KEYWORD, Value: value})
 				} else {
-					tokens = append(tokens, Token{Type: IDENTIFIER, Value: value})
+					if len(value) != 0 {
+						tokens = append(tokens, Token{Type: IDENTIFIER, Value: value})
+					}
 				}
 			}
 		}
