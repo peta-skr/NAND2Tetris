@@ -1,0 +1,1 @@
+{map[size:map[index:2 kind:field type:int] x:map[index:0 kind:field type:int] y:map[index:1 kind:field type:int]] map[] map[decSize:map[] dispose:map[] draw:map[] erase:map[] incSize:map[] moveDown:map[] moveLeft:map[] moveRight:map[] moveUp:map[] new:map[asize:map[index:2 kind:arg type:int] ax:map[index:0 kind:arg type:int] ay:map[index:1 kind:arg type:int]]] 1}

@@ -160,7 +160,6 @@ func (s *SymbolTable) VarCount(tableName string, kind string) int {
 			table := s.SubroutineSymbolTables[tableName]
 			count := 0
 			for _, i := range table {
-				fmt.Println("this: ", i)
 				if i["kind"] == VAR {
 					count++
 				}
@@ -182,7 +181,17 @@ func (s *SymbolTable) KindOf(scopeName string, name string) string {
 		}
 	} else {
 		if table, ok := s.SubroutineSymbolTables[scopeName]; ok {
-			return table[name]["kind"]
+
+			kind := table[name]["kind"]
+			if kind == "" {
+			} else {
+				return table[name]["kind"]
+			}
+
+		}
+
+		if _, ok := s.ClassSymbolTable[name]; ok {
+			return s.ClassSymbolTable[name]["kind"]
 		} else {
 			return NONE
 		}
@@ -198,7 +207,14 @@ func (s *SymbolTable) TypeOf(scopeName string, name string) string {
 		}
 	} else {
 		if table, ok := s.SubroutineSymbolTables[scopeName]; ok {
-			return table[name]["type"]
+			typeName := table[name]["type"]
+			if typeName == "" {
+			} else {
+				return table[name]["type"]
+			}
+		}
+		if _, ok := s.ClassSymbolTable[name]; ok {
+			return s.ClassSymbolTable[name]["type"]
 		} else {
 			return NONE
 		}
@@ -206,6 +222,7 @@ func (s *SymbolTable) TypeOf(scopeName string, name string) string {
 }
 
 func (s *SymbolTable) IndexOf(scopeName string, name string) int {
+
 	if s.CurrentScope == CLASS_SCOPE {
 		if _, ok := s.ClassSymbolTable[name]; ok {
 			index, _ := strconv.Atoi(s.ClassSymbolTable[name]["index"])
@@ -215,7 +232,14 @@ func (s *SymbolTable) IndexOf(scopeName string, name string) int {
 		}
 	} else {
 		if table, ok := s.SubroutineSymbolTables[scopeName]; ok {
-			index, _ := strconv.Atoi(table[name]["index"])
+
+			index, err := strconv.Atoi(table[name]["index"])
+			if err == nil {
+				return index
+			}
+		}
+		if _, ok := s.ClassSymbolTable[name]; ok {
+			index, _ := strconv.Atoi(s.ClassSymbolTable[name]["index"])
 			return index
 		} else {
 			return -1

@@ -25,27 +25,43 @@ func Analyzer(source string) {
 			return
 		}
 
+		first := true
+
 		for _, file := range files {
 			if filepath.Ext(file.Name()) == ".jack" {
-				fmt.Println(file.Name())
-				Analyze(filepath.Join(source, file.Name()))
+				fmt.Println("Dir: " + file.Name())
+				Analyze(filepath.Join(source, file.Name()), first)
+				first = false
 			}
 		}
 	} else if filepath.Ext(source) == ".jack" {
 		// ファイルの場合
 		fmt.Println(filepath.Base(source))
-		Analyze(source)
+		Analyze(source, true)
 
 	} else {
 		fmt.Println("ファイルまたはディレクトリを指定してください")
 	}
 }
 
-func Analyze(source string) {
+func Analyze(source string, fristFlag bool) {
 	tokenizer := jacktokenizer.Tokenizer(source)
 	vmFilePath := source[:len(source)-5] + ".vm"
+	// vmFilePath := filepath.Dir(source) + "/Main.vm"
+
+	if fristFlag {
+
+		// 同名のファイルがある場合は削除
+		if _, err := os.Stat(vmFilePath); err == nil {
+			err := os.Remove(vmFilePath)
+			if err != nil {
+				fmt.Println("エラー:", err)
+				return
+			}
+		}
+	}
+
 	parseTree, symboltable := compilationengine.Compile(*tokenizer, vmFilePath)
-	fmt.Println("symboltable:", symboltable)
 
 	codegenerator.GenerateCode(parseTree, symboltable, vmFilePath)
 

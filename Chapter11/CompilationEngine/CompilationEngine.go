@@ -826,8 +826,6 @@ func CompileExpressionList(tokenize *jacktokenizer.JackTokenizer, doNode *Contai
 		// 式
 		CompileExpression(tokenize, &expressionListNode, symboltable)
 
-		fmt.Println("expressionListNode.Children:", expressionListNode.Children)
-
 		// ","
 		if tokenize.GetTokenValue() != "," {
 			if tokenize.GetTokenType() == jacktokenizer.SYMBOL && tokenize.GetTokenValue() == ")" {

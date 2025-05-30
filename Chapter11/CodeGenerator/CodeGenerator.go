@@ -21,6 +21,8 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 
 	vmwriter := vmwriter.Constructor()
 
+	labelCount = 0
+
 	for _, node := range parseTree.Nodes {
 		processNode(node, symboltable, vmFilePath, &vmwriter)
 	}
@@ -28,9 +30,15 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 	// VMWriterの内容をファイルに書き込む
 	vmContent := vmwriter.Content                    // []string 型
 	vmContentString := strings.Join(vmContent, "\n") // 改行区切りの文字列に変換
+	file, err := os.OpenFile(vmFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("エラー:", err)
+		return
+	}
+	defer file.Close()
 
 	// ファイルに書き込む
-	if err := os.WriteFile(vmFilePath, []byte(vmContentString), 0644); err != nil {
+	if _, err := file.WriteString(vmContentString + "\n"); err != nil {
 		fmt.Fprintf(os.Stderr, "VMファイルの書き込みに失敗しました: %v\n", err)
 	} else {
 		fmt.Printf("VMファイル '%s' が正常に作成されました。\n", vmFilePath)
@@ -83,6 +91,7 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 	// サブルーチンのコード生成処理
 	// サブルーチン名を取得
 	subroutineName = node.Name
+	subroutineType := ""
 
 	symboltable.CurrentScope = symtable.SUBROUTINE_SCOPE
 
@@ -98,10 +107,36 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 			}
 		case compilationengine.ParseNode:
 			if n.Type == jacktokenizer.IDENTIFIER {
+				if className == n.Value {
+					continue
+				}
 				// サブルーチン名を取得
 				subroutineName = n.Value
 				functionName := fmt.Sprintf("%s.%s", className, subroutineName)
 				vmwriter.WriteFunction(functionName, symboltable.VarCount(subroutineName, "var"))
+
+				// メソッドやコンストラクタの場合の処理
+				if subroutineType == "constructor" {
+					symboltable.CurrentScope = symtable.CLASS_SCOPE
+					vmwriter.WritePush("constant", symboltable.VarCount(subroutineName, "field"))
+					vmwriter.WriteCall("Memory.alloc", 1)
+					vmwriter.WritePop("pointer", 0)
+					symboltable.CurrentScope = symtable.SUBROUTINE_SCOPE
+				} else if subroutineType == "method" {
+					vmwriter.WritePush("argument", 0)
+					vmwriter.WritePop("pointer", 0)
+				}
+
+			} else if n.Type == jacktokenizer.KEYWORD {
+				// サブルーチンの種類を取得
+				switch n.Value {
+				case "function":
+					subroutineType = "function"
+				case "method":
+					subroutineType = "method"
+				case "constructor":
+					subroutineType = "constructor"
+				}
 			}
 		}
 	}
@@ -232,8 +267,6 @@ func generateLetStatementCode(node compilationengine.ContainerNode, symboltable 
 
 	varName := ""
 
-	fmt.Println("let:", node)
-
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
@@ -273,14 +306,14 @@ func generateIfStatementCode(node compilationengine.ContainerNode, symboltable s
 	ifLabel := ""
 	elseLabel := ""
 
-	fmt.Println("if:", node)
-
 	labelCountStr = strconv.Itoa(labelCount)
 	elseLabel = className + "_" + labelCountStr
 	labelCount++
 	labelCountStr = strconv.Itoa(labelCount)
 	ifLabel = className + "_" + labelCountStr
 	labelCount++
+
+	useElse := false
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
@@ -309,6 +342,7 @@ func generateIfStatementCode(node compilationengine.ContainerNode, symboltable s
 				// vmwriter.WriteGoto(condition)
 				vmwriter.WriteGoto(elseLabel) // 条件式がtrueの場合に実行される
 				vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
+				useElse = true                // else文がある場合は、useElseをtrueにする
 			} else if n.Type == jacktokenizer.KEYWORD && n.Value == "if" {
 				// VMWriterにif文のコードを書き込む
 				// label := fmt.Sprintf("%s.%d", className, labelCount)
@@ -317,6 +351,13 @@ func generateIfStatementCode(node compilationengine.ContainerNode, symboltable s
 		}
 
 	}
+
+	if !useElse {
+		// else文がない場合は、if文の終了ラベルを書き込む
+		vmwriter.WriteGoto(elseLabel) // else文がない場合は、if文の終了ラベルを書き込む
+		vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
+	}
+
 	vmwriter.WriteLabel(elseLabel) // else文の終了ラベル
 }
 
@@ -370,6 +411,8 @@ func generateDoStatementCode(node compilationengine.ContainerNode, symboltable s
 
 	doName := ""
 	argNum := 0
+	var objectName string
+	isMethodCall := false
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
@@ -378,17 +421,47 @@ func generateDoStatementCode(node compilationengine.ContainerNode, symboltable s
 			case "expressionList":
 				// 引数リストの処理
 				// ここでは引数リストのコード生成処理を呼び出す
-				argNum = generateExpressionListCode(n, symboltable, vmwriter)
+				argNum += generateExpressionListCode(n, symboltable, vmwriter)
 			}
 		case compilationengine.ParseNode:
 			if n.Type == jacktokenizer.IDENTIFIER {
-				// 関数名を取得
+
+				if doName == "" {
+					// 最初の識別子はメソッド名またはオブジェクト名として扱う
+					objectName = n.Value
+				}
 				doName += n.Value
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "." {
-				// 引数リストの開始
 				doName += "."
+				isMethodCall = true
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ")" {
-				// 引数リストの終了
+				if isMethodCall {
+					// フィールドのメソッド呼び出しの場合、オブジェクト名を取得
+					kind := getKind(subroutineName, objectName, symboltable)
+					if kind != "" {
+						index := symboltable.IndexOf(subroutineName, objectName)
+						typeName := symboltable.TypeOf(subroutineName, objectName)
+
+						idx := strings.LastIndex(doName, ".")
+						if idx != -1 && idx+1 < len(doName) {
+							doName = doName[idx+1:]
+						} else {
+							fmt.Println("区切り文字が見つからないか、ピリオドの後に文字がありません。")
+						}
+						doName = typeName + "." + doName
+						vmwriter.WritePush(kind, index)
+					}
+				} else {
+					// メソッド呼び出しの場合
+					vmwriter.WritePush("pointer", 0)
+					doName = className + "." + doName
+				}
+
+				if argNum == 0 {
+					// 引数がない場合は1を設定
+					argNum = 1
+				}
+
 				vmwriter.WriteCall(doName, argNum)
 			}
 		}
@@ -397,8 +470,10 @@ func generateDoStatementCode(node compilationengine.ContainerNode, symboltable s
 }
 
 func generateReturnStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
+
+	hasExpression := false
+
 	// VMWriterにreturn文のコードを書き込む
-	length := len(node.Children)
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
@@ -407,22 +482,17 @@ func generateReturnStatementCode(node compilationengine.ContainerNode, symboltab
 				// 式の処理
 				// ここでは式のコード生成処理を呼び出す
 				generateExpressionCode(n, symboltable, vmwriter)
+				hasExpression = true
 			}
-		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.KEYWORD && n.Value == "return" {
-				// return文の処理
-				// VMWriterにreturn文のコードを書き込む
-				if length < 3 {
-					vmwriter.WritePush("constant", 0)
-					vmwriter.WriteReturn()
-				}
-			}
+
 		}
 	}
-	if length > 2 {
-		// VMWriterにreturn文のコードを書き込む
-		vmwriter.WriteReturn()
+	if !hasExpression {
+		// 式がない場合は0を返す
+		vmwriter.WritePush("constant", 0)
 	}
+
+	vmwriter.WriteReturn()
 }
 
 func generateExpressionListCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) int {
@@ -542,6 +612,9 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 				case "false":
 					// falseの場合は0をpush
 					vmwriter.WritePush("constant", 0)
+				case "this":
+					// thisの場合はポインタ0をpush
+					vmwriter.WritePush("pointer", 0)
 				}
 			case jacktokenizer.IDENTIFIER:
 				// 識別子の処理
@@ -611,7 +684,7 @@ func getKind(subroutineName string, name string, symboltable symtable.SymbolTabl
 	case "static":
 		return "static"
 	case "field":
-		return "field"
+		return "this"
 	case "arg":
 		return "argument"
 	case "var":
@@ -619,7 +692,6 @@ func getKind(subroutineName string, name string, symboltable symtable.SymbolTabl
 	default:
 		return ""
 	}
-	return ""
 }
 
 func generateSubroutineCall(methodName string, node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
