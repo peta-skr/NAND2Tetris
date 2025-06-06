@@ -266,6 +266,7 @@ func generateStatementCode(node compilationengine.ContainerNode, symboltable sym
 func generateLetStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
 
 	varName := ""
+	isArray := false
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
@@ -281,17 +282,33 @@ func generateLetStatementCode(node compilationengine.ContainerNode, symboltable 
 			if n.Type == jacktokenizer.IDENTIFIER {
 				// 変数名を取得
 				varName = n.Value
-				// // 変数のインデックスを取得
-				// fmt.Println("varName", varName)
-				// index := symboltable.IndexOf(subroutineName, varName)
-				// // VMWriterにlet文のコードを書き込む
-				// vmwriter.WritePush("local", index)
+				// 次のノードが "[" なら配列アクセス
+				// if i+1 < len(node.Children) {
+				// 	if next, ok := node.Children[i+1].(compilationengine.ParseNode); ok && next.Type == jacktokenizer.SYMBOL && next.Value == "[" {
+				// 		isArray = true
+				// 	}
+				// }
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ";" {
-				// 変数のインデックスを取得
-				index := symboltable.IndexOf(subroutineName, varName)
-				// let文の代入処理
-				kind := getKind(subroutineName, varName, symboltable)
-				vmwriter.WritePop(kind, index)
+
+				if isArray {
+					// 配列の要素に代入する場合
+					vmwriter.WritePop("temp", 0)    // 配列の要素を一時領域にポップ
+					vmwriter.WritePop("pointer", 1) // ポインタ1に配列のベースアドレスをポップ
+					vmwriter.WritePush("temp", 0)   // 一時領域から配列の要素をプッシュ
+					vmwriter.WritePop("that", 0)    // ポインタ1のアドレスに配列の要素を代入
+
+				} else {
+					// 変数のインデックスを取得
+					index := symboltable.IndexOf(subroutineName, varName)
+					// let文の代入処理
+					kind := getKind(subroutineName, varName, symboltable)
+					vmwriter.WritePop(kind, index)
+				}
+			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "]" {
+				vmwriter.WritePush("local", 0)  // 配列のベースアドレス
+				vmwriter.WriteArithmetic("add") // インデックスを加算
+
+				isArray = true // 配列の要素にアクセスする場合は、isArrayをtrueにする
 			}
 		}
 
@@ -601,7 +618,18 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 				}
 			case jacktokenizer.STRING_CONST:
 				// 文字列定数の処理
-				vmwriter.WritePush("constant", intValue)
+
+				// 文字列の長さを取得
+				stringLength := len(n.Value)
+				vmwriter.WritePush("constant", stringLength)
+
+				// 文字列をVMWriterに書き込む
+				vmwriter.WriteCall("String.new", 1) // 新しい文字列を作成
+				for _, char := range n.Value {
+					// 各文字をVMWriterに書き込む
+					vmwriter.WritePush("constant", int(char))  // 文字を定数としてプッシュ
+					vmwriter.WriteCall("String.appendChar", 2) // 文字列に文字を追加
+				}
 			case jacktokenizer.KEYWORD:
 				// キーワード定数の処理
 				switch n.Value {
@@ -627,9 +655,9 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 					} else if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "." {
 						methodName += n.Value + "."
 					} else {
-						// 通常の変数として処理
-						kind := getKind(subroutineName, n.Value, symboltable)
-						vmwriter.WritePush(kind, symboltable.IndexOf(subroutineName, n.Value))
+						// // 通常の変数として処理
+						// kind := getKind(subroutineName, n.Value, symboltable)
+						// vmwriter.WritePush(kind, symboltable.IndexOf(subroutineName, n.Value))
 					}
 				} else {
 					// 通常の変数として処理
@@ -637,24 +665,20 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 					vmwriter.WritePush(kind, symboltable.IndexOf(subroutineName, n.Value))
 				}
 			case jacktokenizer.SYMBOL:
-				if n.Value == "-" {
-					// // 負の数を処理
-					// if i+1 < len(node.Children) {
-					// 	if nextNode, ok := node.Children[i+1].(compilationengine.ContainerNode); ok && nextNode.Name == "term" {
-					// 		// 次のノードが整数定数の場合
-					// 		intValue, _ := strconv.Atoi(nextNode.Children[0].(compilationengine.ParseNode).Value)
-					// 		vmwriter.WritePush("constant", intValue)
-					// 		vmwriter.WriteArithmetic("neg")
-					// 		break
-					// 	}
-					// }
-					// // 通常の負号演算子として処理
-					// vmwriter.WriteArithmetic("neg")
-					negFlag = true
 
-				} else if n.Value == "~" {
+				switch n.Value {
+				case "-":
+					negFlag = true
+				case "~":
 					// ビット反転演算子の処理
 					operations = append(operations, n.Value)
+				case "]":
+					// 配列のインデックスアクセスの場合
+					vmwriter.WritePush("local", 0)  // 配列のベースアドレス
+					vmwriter.WriteArithmetic("add") // インデックスを加算
+					vmwriter.WritePop("pointer", 1) // that = arr + i
+					vmwriter.WritePush("that", 0)   // arr[i] の値を取得
+				default:
 				}
 			}
 		case compilationengine.ContainerNode:
