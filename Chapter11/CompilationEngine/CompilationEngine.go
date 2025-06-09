@@ -2,6 +2,7 @@ package compilationengine
 
 import (
 	jacktokenizer "Chapter11/JackTokenizer"
+	SubroutineTable "Chapter11/SubroutineTable"
 	Symboltable "Chapter11/SymbolTable"
 	"fmt"
 )
@@ -134,10 +135,11 @@ func addTokenNode(tokenize *jacktokenizer.JackTokenizer, parentNode *ContainerNo
 // 	return ""
 // }
 
-func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) (ParseTree, Symboltable.SymbolTable) {
+func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) (ParseTree, Symboltable.SymbolTable, SubroutineTable.SubroutineTable) {
 	parseTree := ParseTree{}
 
 	symboltable := Symboltable.Constructor()
+	subroutinetable := SubroutineTable.Constructor()
 
 	// トークンを解析してパースツリーを構築
 	for tokenize.HasMoreTokens() {
@@ -147,16 +149,16 @@ func Compile(tokenize jacktokenizer.JackTokenizer, outputFile string) (ParseTree
 		case jacktokenizer.KEYWORD:
 			switch tokenize.GetKeyword() {
 			case jacktokenizer.CLASS:
-				parseTree.CompileClass(&tokenize, &symboltable)
+				parseTree.CompileClass(&tokenize, &symboltable, &subroutinetable)
 			}
 		}
 		tokenize.Advance()
 	}
 
-	return parseTree, symboltable
+	return parseTree, symboltable, subroutinetable
 }
 
-func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer, symboltable *Symboltable.SymbolTable) {
+func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer, symboltable *Symboltable.SymbolTable, subroutinetable *SubroutineTable.SubroutineTable) {
 	classContentNode := ContainerNode{Name: "class", Children: []Node{}}
 
 	// 'class' キーワード
@@ -190,9 +192,9 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer, symbolta
 		case jacktokenizer.KEYWORD:
 			switch tokenize.GetKeyword() {
 			case jacktokenizer.STATIC, jacktokenizer.FIELD:
-				CompileClassVarDec(tokenize, &classContentNode, symboltable)
+				CompileClassVarDec(tokenize, &classContentNode, symboltable, subroutinetable)
 			case jacktokenizer.METHOD, jacktokenizer.FUNCTION, jacktokenizer.CONSTRUCTOR:
-				CompileSubroutine(tokenize, &classContentNode, symboltable)
+				CompileSubroutine(tokenize, &classContentNode, symboltable, subroutinetable)
 			default:
 				return
 			}
@@ -210,7 +212,7 @@ func (p *ParseTree) CompileClass(tokenize *jacktokenizer.JackTokenizer, symbolta
 	p.AddNode(classContentNode)
 }
 
-func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode, symboltable *Symboltable.SymbolTable) {
+func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode, symboltable *Symboltable.SymbolTable, subroutinetable *SubroutineTable.SubroutineTable) {
 	classVarDecNode := ContainerNode{Name: "classVarDec", Children: []Node{}}
 
 	// 'static' または 'field' キーワード
@@ -256,8 +258,11 @@ func CompileClassVarDec(tokenize *jacktokenizer.JackTokenizer, classContentNode 
 	classContentNode.Children = append(classContentNode.Children, classVarDecNode)
 }
 
-func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode, symboltable *Symboltable.SymbolTable) {
+func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *ContainerNode, symboltable *Symboltable.SymbolTable, subroutinetable *SubroutineTable.SubroutineTable) {
 	subroutineDecNode := ContainerNode{Name: "subroutineDec", Children: []Node{}}
+
+	subroutineType := "" // サブルーチンの種類（"function", "method", "constructor"）
+	subroutineName := "" // サブルーチン名
 
 	// 'constructor', 'function', または 'method' キーワード
 	if !expectToken(tokenize, jacktokenizer.KEYWORD, "constructor") &&
@@ -265,6 +270,7 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 		!expectToken(tokenize, jacktokenizer.KEYWORD, "method") {
 		return // エラー
 	}
+	subroutineType = tokenize.GetTokenValue()
 	addTokenNode(tokenize, &subroutineDecNode)
 
 	// 戻り値の型
@@ -277,6 +283,9 @@ func CompileSubroutine(tokenize *jacktokenizer.JackTokenizer, classContentNode *
 	if tokenize.GetTokenType() != jacktokenizer.IDENTIFIER {
 		return // エラー
 	}
+	subroutineName = tokenize.GetTokenValue()
+	subroutinetable.Define(subroutineName, subroutineType)
+
 	// サブルーチンのスコープを開始
 	symboltable.StartSubroutine(tokenize.GetTokenValue())
 	addTokenNode(tokenize, &subroutineDecNode)

@@ -16,8 +16,12 @@ var className string
 var subroutineName string
 var labelCount int
 var negFlag bool
+var isMethodCall bool
+var subroutineKindMap map[string]map[string]string // クラス名ごとにサブルーチンの種類を記録
 
-func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable.SymbolTable, vmFilePath string) {
+func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable.SymbolTable, vmFilePath string, subroutineKind map[string]map[string]string) {
+
+	subroutineKindMap = subroutineKind // クラス名ごとにサブルーチンの種類を記録
 
 	vmwriter := vmwriter.Constructor()
 
@@ -30,7 +34,7 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 	// VMWriterの内容をファイルに書き込む
 	vmContent := vmwriter.Content                    // []string 型
 	vmContentString := strings.Join(vmContent, "\n") // 改行区切りの文字列に変換
-	file, err := os.OpenFile(vmFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(vmFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Println("エラー:", err)
 		return
@@ -43,6 +47,7 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 	} else {
 		fmt.Printf("VMファイル '%s' が正常に作成されました。\n", vmFilePath)
 	}
+
 }
 
 func processNode(node compilationengine.Node, symboltable symtable.SymbolTable, vmFilePath string, vmwriter *vmwriter.VMWriter) {
@@ -64,6 +69,8 @@ func generateClassCode(node compilationengine.ContainerNode, symboltable symtabl
 	// クラス名を取得
 
 	symboltable.CurrentScope = symtable.CLASS_SCOPE
+
+	// subroutineKindMap[className] = make(map[string]string) // クラス名ごとにサブルーチンの種類を初期化
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
@@ -95,6 +102,9 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 
 	symboltable.CurrentScope = symtable.SUBROUTINE_SCOPE
 
+	// table := subroutineKindMap[className]
+	// fmt.Println(table)
+
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
@@ -118,6 +128,8 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 				// メソッドやコンストラクタの場合の処理
 				if subroutineType == "constructor" {
 					symboltable.CurrentScope = symtable.CLASS_SCOPE
+					fmt.Println(symboltable)
+					fmt.Println(subroutineName)
 					vmwriter.WritePush("constant", symboltable.VarCount(subroutineName, "field"))
 					vmwriter.WriteCall("Memory.alloc", 1)
 					vmwriter.WritePop("pointer", 0)
@@ -132,12 +144,23 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 				switch n.Value {
 				case "function":
 					subroutineType = "function"
+					isMethodCall = false
 				case "method":
 					subroutineType = "method"
+					isMethodCall = true
 				case "constructor":
 					subroutineType = "constructor"
+					isMethodCall = false
 				}
 			}
+			// if subroutineKindMap[className] == nil {
+			// 	fmt.Println("サブルーチンの種類マップが初期化されていません。")
+			// 	fmt.Println("クラス名:", subroutineKindMap[className])
+			// 	subroutineKindMap[className] = make(map[string]string)
+			// 	fmt.Println("サブルーチンの種類マップを初期化しました。")
+			// 	fmt.Println("サブルーチン名:", subroutineKindMap)
+			// }
+			// subroutineKindMap[className][subroutineName] = subroutineType // サブルーチンの種類を記録
 		}
 	}
 
@@ -451,9 +474,11 @@ func generateDoStatementCode(node compilationengine.ContainerNode, symboltable s
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "." {
 				doName += "."
 				isMethodCall = true
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ")" {
-				if isMethodCall {
-					// フィールドのメソッド呼び出しの場合、オブジェクト名を取得
+			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "(" {
+				if !isMethodCall {
+					vmwriter.WritePush("pointer", 0) // thisをポインタ0にプッシュ
+				} else {
+					// メソッド呼び出しの場合、オブジェクト名を取得
 					kind := getKind(subroutineName, objectName, symboltable)
 					if kind != "" {
 						index := symboltable.IndexOf(subroutineName, objectName)
@@ -468,17 +493,52 @@ func generateDoStatementCode(node compilationengine.ContainerNode, symboltable s
 						doName = typeName + "." + doName
 						vmwriter.WritePush(kind, index)
 					}
+				}
+			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ")" {
+				if isMethodCall {
+					// フィールドのメソッド呼び出しの場合、オブジェクト名を取得
+					// kind := getKind(subroutineName, objectName, symboltable)
+					// if kind != "" {
+					// 	index := symboltable.IndexOf(subroutineName, objectName)
+					// 	typeName := symboltable.TypeOf(subroutineName, objectName)
+
+					// 	idx := strings.LastIndex(doName, ".")
+					// 	if idx != -1 && idx+1 < len(doName) {
+					// 		doName = doName[idx+1:]
+					// 	} else {
+					// 		fmt.Println("区切り文字が見つからないか、ピリオドの後に文字がありません。")
+					// 	}
+					// 	doName = typeName + "." + doName
+					// 	fmt.Println("doName:", doName)
+					// 	fmt.Println("kind:", kind)
+					// 	vmwriter.WritePush(kind, index)
+					// }
 				} else {
 					// メソッド呼び出しの場合
-					vmwriter.WritePush("pointer", 0)
+					// vmwriter.WritePush("pointer", 0)
 					doName = className + "." + doName
+					argNum++ // thisを引数としてカウント
 				}
 
-				if argNum == 0 {
+				subroutineClassName := strings.Split(doName, ".")[0]
+				callSubroutineName := doName[strings.LastIndex(doName, ".")+1:]
+				// if subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+				// 	// メソッド呼び出しの場合、thisを引数としてカウント
+				// 	argNum++
+				// }
+				if argNum == 0 && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
 					// 引数がない場合は1を設定
 					argNum = 1
+				} else if className != subroutineClassName && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+					// メソッド呼び出しの場合、thisを引数としてカウント
+					argNum++
 				}
+				//  else if standardClassCheck(subroutineClassName) {
+				// 	// 標準クラスのメソッド呼び出しの場合、thisを引数としてカウント
+				// 	argNum++
+				// }
 
+				doName = strings.ToUpper(string(doName[0])) + doName[1:]
 				vmwriter.WriteCall(doName, argNum)
 			}
 		}
@@ -662,7 +722,8 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 				} else {
 					// 通常の変数として処理
 					kind := getKind(subroutineName, n.Value, symboltable)
-					vmwriter.WritePush(kind, symboltable.IndexOf(subroutineName, n.Value))
+					index := getIndex(subroutineName, n.Value, symboltable, isMethodCall)
+					vmwriter.WritePush(kind, index)
 				}
 			case jacktokenizer.SYMBOL:
 
@@ -702,6 +763,15 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 	return operations
 }
 
+func getIndex(subroutineName string, name string, symboltable symtable.SymbolTable, isMethod bool) int {
+	index := symboltable.IndexOf(subroutineName, name)
+	kind := symboltable.KindOf(subroutineName, name)
+	if kind == "arg" && isMethod {
+		return index + 1 // methodのときはthis分ずらす
+	}
+	return index
+}
+
 func getKind(subroutineName string, name string, symboltable symtable.SymbolTable) string {
 	kind := symboltable.KindOf(subroutineName, name)
 	switch kind {
@@ -727,7 +797,36 @@ func generateSubroutineCall(methodName string, node compilationengine.ContainerN
 		}
 	}
 
+	subroutineClassName := strings.Split(methodName, ".")[0]
+	subroutineClassName = strings.ToUpper(string(subroutineClassName[0])) + subroutineClassName[1:] // クラス名の最初の文字を大文字に変換
+	callSubroutineName := methodName[strings.LastIndex(methodName, ".")+1:]
+	if argCount == 0 && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+		// 引数がない場合は1を設定
+		argCount = 1
+	}
+
 	// メソッド呼び出しのコードを生成
+	objectName := strings.Split(methodName, ".")[0]
+	methodName = strings.ToUpper(string(methodName[0])) + methodName[1:] // メソッド名の最初の文字を大文字に変換
+	fmt.Println("メソッド名:", methodName)
+	kind := getKind(subroutineName, objectName, symboltable)
+	if kind != "" {
+		index := symboltable.IndexOf(subroutineName, objectName)
+		// typeName := symboltable.TypeOf(subroutineName, objectName)
+
+		vmwriter.WritePush(kind, index)
+	}
 	vmwriter.WriteCall(methodName, argCount)
 	// vmwriter.WritePop("local", 0)
+}
+
+func standardClassCheck(className string) bool {
+	// 標準クラスのチェック
+	standardClasses := []string{"Array", "String", "Math", "Output", "Input"}
+	for _, standardClass := range standardClasses {
+		if className == standardClass {
+			return true
+		}
+	}
+	return false
 }

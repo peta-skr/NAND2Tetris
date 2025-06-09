@@ -140,7 +140,14 @@ func (s *SymbolTable) VarCount(tableName string, kind string) int {
 		case STATIC:
 			return class_staticCount
 		case FIELD:
-			return class_fieldCount
+			// テーブル内のFIELDの数を直接カウント
+			count := 0
+			for _, item := range s.ClassSymbolTable {
+				if item["kind"] == FIELD {
+					count++
+				}
+			}
+			return count
 		default:
 			return -1 // エラー処理
 		}
