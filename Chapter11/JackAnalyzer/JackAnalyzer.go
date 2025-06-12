@@ -15,6 +15,9 @@ var compileMap = make(map[string]any)                      // クラス名 -> �
 
 func Analyzer(source string) {
 
+	// subroutineKindMap = make(map[string]map[string]string) // クラス名 -> サブルーチン名 -> サブルーチンの種類("function"/"method"/"constructor")
+	// compileMap = make(map[string]any)                      // クラス名 -> [parseTree, symboltable]
+
 	info, err := os.Stat(source)
 	if err != nil {
 		fmt.Println("エラー:", err)
@@ -71,6 +74,21 @@ func Analyzer(source string) {
 	} else if filepath.Ext(source) == ".jack" {
 		// ファイルの場合
 		Analyze(source, true)
+
+		// 修正後
+		fileName := filepath.Base(source)
+		fmt.Println("FileName: " + fileName)
+		fmt.Println("CompileMap: ", compileMap[fileName])
+		data := compileMap[fileName].([]any)
+		parseTree := data[0].(compilationengine.ParseTree)
+		symTable := data[1].(symboltable.SymbolTable)
+
+		vmFilePath := source[:len(source)-5] + ".vm"
+
+		generateVMCode(
+			parseTree,
+			symTable,
+			vmFilePath)
 
 	} else {
 		fmt.Println("ファイルまたはディレクトリを指定してください")

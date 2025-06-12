@@ -32,8 +32,8 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 	}
 
 	// VMWriterの内容をファイルに書き込む
-	vmContent := vmwriter.Content                    // []string 型
-	vmContentString := strings.Join(vmContent, "\n") // 改行区切りの文字列に変換
+	vmContent := vmwriter.Content                      // []string 型
+	vmContentString := strings.Join(vmContent, "\r\n") // 改行区切りの文字列に変換
 	file, err := os.OpenFile(vmFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		fmt.Println("エラー:", err)
@@ -42,7 +42,7 @@ func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable
 	defer file.Close()
 
 	// ファイルに書き込む
-	if _, err := file.WriteString(vmContentString + "\n"); err != nil {
+	if _, err := file.WriteString(vmContentString); err != nil {
 		fmt.Fprintf(os.Stderr, "VMファイルの書き込みに失敗しました: %v\n", err)
 	} else {
 		fmt.Printf("VMファイル '%s' が正常に作成されました。\n", vmFilePath)
@@ -311,6 +311,7 @@ func generateLetStatementCode(node compilationengine.ContainerNode, symboltable 
 				// 		isArray = true
 				// 	}
 				// }
+
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ";" {
 
 				if isArray {
@@ -328,7 +329,11 @@ func generateLetStatementCode(node compilationengine.ContainerNode, symboltable 
 					vmwriter.WritePop(kind, index)
 				}
 			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "]" {
-				vmwriter.WritePush("local", 0)  // 配列のベースアドレス
+				// vmwriter.WritePush("local", 0)  // 配列のベースアドレス
+				kind := getKind(subroutineName, varName, symboltable)
+				index := symboltable.IndexOf(subroutineName, varName)
+				fmt.Println("kind:", kind, "index:", index, "varName:", varName)
+				vmwriter.WritePush(kind, index) // 変数の値をプッシュ
 				vmwriter.WriteArithmetic("add") // インデックスを加算
 
 				isArray = true // 配列の要素にアクセスする場合は、isArrayをtrueにする
@@ -663,6 +668,7 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 	// 項の処理
 
 	methodName := ""
+	varName := ""
 	for i, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ParseNode:
@@ -703,6 +709,9 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 				case "this":
 					// thisの場合はポインタ0をpush
 					vmwriter.WritePush("pointer", 0)
+				case "null":
+					// nullの場合は0をpush
+					vmwriter.WritePush("constant", 0)
 				}
 			case jacktokenizer.IDENTIFIER:
 				// 識別子の処理
@@ -714,10 +723,10 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 						generateSubroutineCall(methodName, node, symboltable, vmwriter)
 					} else if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "." {
 						methodName += n.Value + "."
-					} else {
-						// // 通常の変数として処理
-						// kind := getKind(subroutineName, n.Value, symboltable)
-						// vmwriter.WritePush(kind, symboltable.IndexOf(subroutineName, n.Value))
+					} else if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "[" {
+						// 配列のインデックスアクセスの場合
+						varName = n.Value
+
 					}
 				} else {
 					// 通常の変数として処理
@@ -735,7 +744,10 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 					operations = append(operations, n.Value)
 				case "]":
 					// 配列のインデックスアクセスの場合
-					vmwriter.WritePush("local", 0)  // 配列のベースアドレス
+					kind := getKind(subroutineName, varName, symboltable)
+					index := symboltable.IndexOf(subroutineName, varName)
+					fmt.Println("kind:", kind, "index:", index, "varName:", varName)
+					vmwriter.WritePush(kind, index) // 配列のベースアドレス
 					vmwriter.WriteArithmetic("add") // インデックスを加算
 					vmwriter.WritePop("pointer", 1) // that = arr + i
 					vmwriter.WritePush("that", 0)   // arr[i] の値を取得
