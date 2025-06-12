@@ -18,11 +18,11 @@ func TestTokenizer(t *testing.T) {
 			return err
 		}
 
-		// ファイルがディレクトリでなく、拡張子が .jack の場合にテストを実行
-		if !info.IsDir() && filepath.Ext(info.Name()) == ".jack" {
+		if info.IsDir() && path != testDir {
+			// Analyze関数を呼び出す
+			Analyzer(path)
+		} else if !info.IsDir() && filepath.Ext(info.Name()) == ".jack" { // ファイルがディレクトリでなく、拡張子が .jack の場合にテストを実行
 			t.Run(info.Name(), func(t *testing.T) {
-				// Analyze関数を呼び出す
-				Analyzer(path)
 				// 生成されたVMファイルのパス
 				generatedVMPath := path[:len(path)-5] + ".vm"
 				// 期待されるVMファイルのパス
@@ -57,34 +57,6 @@ func TestTokenizer(t *testing.T) {
 				}
 			})
 
-			// if !info.IsDir() && filepath.Ext(info.Name()) == ".jack" {
-			// 	t.Run(info.Name(), func(t *testing.T) {
-			// 		Analyze(path)
-
-			// 		// 生成されたXMLファイルのパス
-			// 		generatedXMLPath := path[:len(path)-5] + "_test.xml"
-			// 		// 期待されるXMLファイルのパス
-			// 		expectedXMLPath := path[:len(path)-5] + ".xml"
-
-			// 		// 生成されたXMLファイルを読み込む
-			// 		generatedXML, err := os.ReadFile(generatedXMLPath)
-			// 		if err != nil {
-			// 			t.Fatalf("生成されたXMLファイルを読み取れませんでした: %v", err)
-			// 		}
-
-			// 		// 期待されるXMLファイルを読み込む
-			// 		expectedXML, err := os.ReadFile(expectedXMLPath)
-			// 		if err != nil {
-			// 			t.Fatalf("期待されるXMLファイルを読み取れませんでした: %v", err)
-			// 		}
-
-			// 		// fmt.Println()
-
-			// 		// 生成されたXMLファイルと期待されるXMLファイルの内容を比較
-			// 		if string(generatedXML) != string(expectedXML) {
-			// 			t.Errorf("XMLファイルの内容が一致しません: %s", path)
-			// 		}
-			// 	})
 		}
 		return nil
 	})

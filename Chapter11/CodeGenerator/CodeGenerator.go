@@ -128,8 +128,6 @@ func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable
 				// メソッドやコンストラクタの場合の処理
 				if subroutineType == "constructor" {
 					symboltable.CurrentScope = symtable.CLASS_SCOPE
-					fmt.Println(symboltable)
-					fmt.Println(subroutineName)
 					vmwriter.WritePush("constant", symboltable.VarCount(subroutineName, "field"))
 					vmwriter.WriteCall("Memory.alloc", 1)
 					vmwriter.WritePop("pointer", 0)
@@ -332,7 +330,6 @@ func generateLetStatementCode(node compilationengine.ContainerNode, symboltable 
 				// vmwriter.WritePush("local", 0)  // 配列のベースアドレス
 				kind := getKind(subroutineName, varName, symboltable)
 				index := symboltable.IndexOf(subroutineName, varName)
-				fmt.Println("kind:", kind, "index:", index, "varName:", varName)
 				vmwriter.WritePush(kind, index) // 変数の値をプッシュ
 				vmwriter.WriteArithmetic("add") // インデックスを加算
 
@@ -746,7 +743,6 @@ func generateTermCode(node compilationengine.ContainerNode, symboltable symtable
 					// 配列のインデックスアクセスの場合
 					kind := getKind(subroutineName, varName, symboltable)
 					index := symboltable.IndexOf(subroutineName, varName)
-					fmt.Println("kind:", kind, "index:", index, "varName:", varName)
 					vmwriter.WritePush(kind, index) // 配列のベースアドレス
 					vmwriter.WriteArithmetic("add") // インデックスを加算
 					vmwriter.WritePop("pointer", 1) // that = arr + i
@@ -820,7 +816,6 @@ func generateSubroutineCall(methodName string, node compilationengine.ContainerN
 	// メソッド呼び出しのコードを生成
 	objectName := strings.Split(methodName, ".")[0]
 	methodName = strings.ToUpper(string(methodName[0])) + methodName[1:] // メソッド名の最初の文字を大文字に変換
-	fmt.Println("メソッド名:", methodName)
 	kind := getKind(subroutineName, objectName, symboltable)
 	if kind != "" {
 		index := symboltable.IndexOf(subroutineName, objectName)

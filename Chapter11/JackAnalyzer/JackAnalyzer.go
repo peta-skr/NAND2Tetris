@@ -37,7 +37,6 @@ func Analyzer(source string) {
 
 		for _, file := range files {
 			if filepath.Ext(file.Name()) == ".jack" {
-				fmt.Println("Dir: " + file.Name())
 				// if file.Name() == "Main.jack" {
 				// Main.jackは最後に処理する
 				// 	mainPath = filepath.Join(source, file.Name())
@@ -77,8 +76,6 @@ func Analyzer(source string) {
 
 		// 修正後
 		fileName := filepath.Base(source)
-		fmt.Println("FileName: " + fileName)
-		fmt.Println("CompileMap: ", compileMap[fileName])
 		data := compileMap[fileName].([]any)
 		parseTree := data[0].(compilationengine.ParseTree)
 		symTable := data[1].(symboltable.SymbolTable)
