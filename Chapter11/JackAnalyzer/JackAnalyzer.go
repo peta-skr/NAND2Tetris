@@ -122,5 +122,6 @@ func Analyze(source string, fristFlag bool) {
 }
 
 func generateVMCode(parseTree compilationengine.ParseTree, symboltable symboltable.SymbolTable, vmFilePath string) {
-	codegenerator.GenerateCode(parseTree, symboltable, vmFilePath, subroutineKindMap)
+	cg := codegenerator.New(symboltable, subroutineKindMap)
+	cg.Generate(parseTree, vmFilePath)
 }

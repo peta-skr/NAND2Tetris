@@ -4,7 +4,6 @@ import (
 	compilationengine "Chapter11/CompilationEngine"
 	jacktokenizer "Chapter11/JackTokenizer"
 	symboltable "Chapter11/SymbolTable"
-	symtable "Chapter11/SymbolTable"
 	vmwriter "Chapter11/VmWriter"
 	"fmt"
 	"os"
@@ -12,776 +11,727 @@ import (
 	"strings"
 )
 
-var className string
-var subroutineName string
-var labelCount int
-var negFlag bool
-var isMethodCall bool
-var subroutineKindMap map[string]map[string]string // クラス名ごとにサブルーチンの種類を記録
+// コード生成に必要な状態を保持する構造体
+type CodeGenerator struct {
+	className         string
+	subroutineName    string
+	labelCount        int
+	negFlag           bool
+	isMethodCall      bool
+	subroutineKindMap map[string]map[string]string // クラス名ごとにサブルーチンの種類を記録
+	symboltable       symboltable.SymbolTable
+	vmwriter          vmwriter.VMWriter
+}
 
-func GenerateCode(parseTree compilationengine.ParseTree, symboltable symboltable.SymbolTable, vmFilePath string, subroutineKind map[string]map[string]string) {
+const (
+	CLASS_SCOPE      = symboltable.CLASS_SCOPE
+	SUBROUTINE_SCOPE = symboltable.SUBROUTINE_SCOPE
+)
 
-	subroutineKindMap = subroutineKind // クラス名ごとにサブルーチンの種類を記録
+// 新しいCodeGeneratorを作成
+func New(symbolTable symboltable.SymbolTable, subroutineKind map[string]map[string]string) *CodeGenerator {
+	return &CodeGenerator{
+		labelCount:        0,
+		subroutineKindMap: subroutineKind, // クラス名ごとにサブルーチンの種類を記録
+		symboltable:       symbolTable,
+		vmwriter:          vmwriter.Constructor(),
+	}
+}
 
-	vmwriter := vmwriter.Constructor()
-
-	labelCount = 0
-
+// VMコードを生成して指定されたパスに保存
+func (cg *CodeGenerator) Generate(parseTree compilationengine.ParseTree, vmFilePath string) error {
+	// パースツリーの処理
 	for _, node := range parseTree.Nodes {
-		processNode(node, symboltable, vmFilePath, &vmwriter)
+		cg.processNode(node)
 	}
 
-	// VMWriterの内容をファイルに書き込む
-	vmContent := vmwriter.Content                      // []string 型
+	return cg.writeToFile(vmFilePath)
+}
+
+// VMコードをファイルに書き込む
+func (cg *CodeGenerator) writeToFile(filePath string) error {
+	vmContent := cg.vmwriter.Content                   // []string 型
 	vmContentString := strings.Join(vmContent, "\r\n") // 改行区切りの文字列に変換
-	file, err := os.OpenFile(vmFilePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+
+	file, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		fmt.Println("エラー:", err)
-		return
+		return fmt.Errorf("ファイルを開けません: %v", err)
 	}
 	defer file.Close()
 
 	// ファイルに書き込む
 	if _, err := file.WriteString(vmContentString); err != nil {
-		fmt.Fprintf(os.Stderr, "VMファイルの書き込みに失敗しました: %v\n", err)
-	} else {
-		fmt.Printf("VMファイル '%s' が正常に作成されました。\n", vmFilePath)
+		return fmt.Errorf("VMファイルの書き込みに失敗: %v", err)
 	}
 
+	fmt.Printf("VMファイル '%s' を作成しました。\n", filePath)
+	return nil
 }
 
-func processNode(node compilationengine.Node, symboltable symtable.SymbolTable, vmFilePath string, vmwriter *vmwriter.VMWriter) {
+func (cg *CodeGenerator) processNode(node compilationengine.Node) {
 	// ノードの種類に応じて処理を分岐
 	switch n := node.(type) {
 	case compilationengine.ContainerNode:
 		switch n.Name {
 		case "class":
-			generateClassCode(n, symboltable, vmwriter)
-		case "subroutineDec":
+			cg.generateClassCode(n)
+			// case "subroutineDec":
+			// 	cg.generateSubroutineDecCode(n)
 		}
-	case compilationengine.ParseNode:
-		// 必要に応じてシンボルテーブルやVMコード生成処理を追加
 	}
 }
 
-func generateClassCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// クラスのコード生成処理
+// クラスのコード生成
+func (cg *CodeGenerator) generateClassCode(node compilationengine.ContainerNode) {
 	// クラス名を取得
 
-	symboltable.CurrentScope = symtable.CLASS_SCOPE
-
-	// subroutineKindMap[className] = make(map[string]string) // クラス名ごとにサブルーチンの種類を初期化
+	cg.symboltable.CurrentScope = symboltable.CLASS_SCOPE
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
 			switch n.Name {
 			case "subroutineDec":
-				generateSubroutineDecCode(n, symboltable, vmwriter)
+				cg.generateSubroutineDecCode(n)
 			}
 		case compilationengine.ParseNode:
 			if n.Type == jacktokenizer.IDENTIFIER {
 				// クラス名を取得
-				className = n.Value
+				cg.className = n.Value
 			}
 		}
 	}
 
-	// クラスのシンボルテーブルを取得
-	// classSymbolTable := symboltable.ClassSymbolTable[className]
-
-	// VMWriterにクラスのコードを書き込む
-	// vmwriter.WriteClass(className, classSymbolTable)
 }
 
-func generateSubroutineDecCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// サブルーチンのコード生成処理
-	// サブルーチン名を取得
-	subroutineName = node.Name
-	subroutineType := ""
+// サブルーチン宣言からVMコードを生成する
+func (cg *CodeGenerator) generateSubroutineDecCode(node compilationengine.ContainerNode) {
+	// スコープを設定
+	cg.symboltable.CurrentScope = symboltable.SUBROUTINE_SCOPE
 
-	symboltable.CurrentScope = symtable.SUBROUTINE_SCOPE
+	// サブルーチンの情報を収集
+	var subroutineType, subroutineName string
 
-	// table := subroutineKindMap[className]
-	// fmt.Println(table)
+	// サブルーチン情報を収集する
+	cg.collectSubroutineInfo(node, &subroutineType, &subroutineName)
 
+	// サブルーチン情報が揃ったらVMコードを生成
+	if subroutineName != "" {
+		// サブルーチンの宣言を生成
+		cg.generateSubroutineDeclaration(subroutineName)
+
+		// メソッドやコンストラクタの場合の特別な初期化処理
+		cg.handleSpecialSubroutineType(subroutineType)
+	}
+
+	// サブルーチンボディの処理
+	for _, child := range node.Children {
+		if n, ok := child.(compilationengine.ContainerNode); ok && n.Name == "subroutineBody" {
+			cg.generateSubroutineBodyCode(n)
+		}
+	}
+}
+
+// サブルーチン情報を収集するヘルパー関数
+func (cg *CodeGenerator) collectSubroutineInfo(node compilationengine.ContainerNode, subroutineType *string, subroutineName *string) {
 	for _, child := range node.Children {
 		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "parameterList":
-				// パラメータリストの処理
-				generateParameterListCode(n, symboltable, vmwriter)
-			case "subroutineBody":
-				generateSubroutineBodyCode(n, symboltable, vmwriter)
-			}
 		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.IDENTIFIER {
-				if className == n.Value {
-					continue
-				}
+			if n.Type == jacktokenizer.IDENTIFIER && cg.className != n.Value {
 				// サブルーチン名を取得
-				subroutineName = n.Value
-				functionName := fmt.Sprintf("%s.%s", className, subroutineName)
-				vmwriter.WriteFunction(functionName, symboltable.VarCount(subroutineName, "var"))
-
-				// メソッドやコンストラクタの場合の処理
-				if subroutineType == "constructor" {
-					symboltable.CurrentScope = symtable.CLASS_SCOPE
-					vmwriter.WritePush("constant", symboltable.VarCount(subroutineName, "field"))
-					vmwriter.WriteCall("Memory.alloc", 1)
-					vmwriter.WritePop("pointer", 0)
-					symboltable.CurrentScope = symtable.SUBROUTINE_SCOPE
-				} else if subroutineType == "method" {
-					vmwriter.WritePush("argument", 0)
-					vmwriter.WritePop("pointer", 0)
-				}
-
+				*subroutineName = n.Value
+				cg.subroutineName = n.Value
 			} else if n.Type == jacktokenizer.KEYWORD {
-				// サブルーチンの種類を取得
 				switch n.Value {
-				case "function":
-					subroutineType = "function"
-					isMethodCall = false
-				case "method":
-					subroutineType = "method"
-					isMethodCall = true
-				case "constructor":
-					subroutineType = "constructor"
-					isMethodCall = false
+				case "function", "method", "constructor":
+					*subroutineType = n.Value
+
+					// サブルーチンの種類を設定
+					if cg.subroutineKindMap[cg.className] == nil {
+						cg.subroutineKindMap[cg.className] = make(map[string]string)
+					}
+					cg.subroutineKindMap[cg.className][*subroutineName] = *subroutineType
+
+					// メソッドフラグ設定
+					cg.isMethodCall = (*subroutineType == "method")
 				}
 			}
-			// if subroutineKindMap[className] == nil {
-			// 	fmt.Println("サブルーチンの種類マップが初期化されていません。")
-			// 	fmt.Println("クラス名:", subroutineKindMap[className])
-			// 	subroutineKindMap[className] = make(map[string]string)
-			// 	fmt.Println("サブルーチンの種類マップを初期化しました。")
-			// 	fmt.Println("サブルーチン名:", subroutineKindMap)
-			// }
-			// subroutineKindMap[className][subroutineName] = subroutineType // サブルーチンの種類を記録
 		}
 	}
-
-	// サブルーチンのシンボルテーブルを取得
-	// subroutineSymbolTable := symboltable.SubroutineSymbolTable[subroutineName]
-
-	// VMWriterにサブルーチンのコードを書き込む
-	// vmwriter.WriteSubroutine(subroutineName, subroutineSymbolTable)
 }
 
-func generateSubroutineBodyCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// サブルーチンボディのコード生成処理
+// サブルーチン宣言のVMコードを生成するヘルパー関数
+func (cg *CodeGenerator) generateSubroutineDeclaration(subroutineName string) {
+	// サブルーチン名をクラス名と結合
+	functionName := fmt.Sprintf("%s.%s", cg.className, subroutineName)
+
+	// ローカル変数の数を取得
+	localVarCount := cg.symboltable.VarCount(subroutineName, "var")
+
+	// サブルーチン宣言コード生成
+	cg.vmwriter.WriteFunction(functionName, localVarCount)
+}
+
+// メソッドやコンストラクタの場合の特別処理
+func (cg *CodeGenerator) handleSpecialSubroutineType(subroutineType string) {
+	switch subroutineType {
+	case "constructor":
+		// コンストラクタの場合、オブジェクトのメモリ確保
+		cg.symboltable.CurrentScope = symboltable.CLASS_SCOPE
+		cg.vmwriter.WritePush("constant", cg.symboltable.VarCount(cg.subroutineName, "field"))
+		cg.vmwriter.WriteCall("Memory.alloc", 1)
+		cg.vmwriter.WritePop("pointer", 0)
+		cg.symboltable.CurrentScope = symboltable.SUBROUTINE_SCOPE
+	case "method":
+		// メソッドの場合、thisをセット
+		cg.vmwriter.WritePush("argument", 0)
+		cg.vmwriter.WritePop("pointer", 0)
+	}
+}
+
+// サブルーチンボディのコード生成
+func (cg *CodeGenerator) generateSubroutineBodyCode(node compilationengine.ContainerNode) {
 	// ローカル変数の処理
 	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "varDec":
-				// ローカル変数の処理
-				generateVarDecCode(n, symboltable, vmwriter)
-			case "statements":
-				// ステートメントの処理
-				generateStatementsCode(n, symboltable, vmwriter)
-			}
+		if n, ok := child.(compilationengine.ContainerNode); ok && n.Name == "statements" {
+			// ステートメントの処理
+			cg.generateStatementsCode(n)
 		}
 	}
 
-	// VMWriterにサブルーチンボディのコードを書き込む
-	// vmwriter.WriteSubroutineBody(subroutineName, localSymbolTable)
 }
 
-func generateParameterListCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// パラメータリストのコード生成処理
-	// パラメータの処理
+// ステートメントのコード生成処理
+func (cg *CodeGenerator) generateStatementsCode(node compilationengine.ContainerNode) {
 	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.IDENTIFIER {
-				// vmwriter.WritePush("argument", symboltable.IndexOf(subroutineName, n.Value))
-			}
-		}
-	}
-
-	// VMWriterにパラメータリストのコードを書き込む
-	// vmwriter.WriteParameterList(subroutineName, parameterSymbolTable)
-}
-
-// 特に何もしない
-func generateVarDecCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// ローカル変数のコード生成処理
-	// ローカル変数の処理
-	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "var":
-				// ローカル変数の処理
-			}
-		}
-	}
-
-	// VMWriterにローカル変数のコードを書き込む
-	// vmwriter.WriteVarDec(subroutineName, localSymbolTable)
-}
-
-func generateStatementsCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// ステートメントのコード生成処理
-	// ステートメントの処理
-	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
+		if n, ok := child.(compilationengine.ContainerNode); ok {
 			switch n.Name {
 			case "letStatement":
-				// let文の処理
-				generateLetStatementCode(n, symboltable, vmwriter)
+				cg.generateLetStatementCode(n)
 			case "ifStatement":
-				// if文の処理
-				generateIfStatementCode(n, symboltable, vmwriter)
+				cg.generateIfStatementCode(n)
 			case "whileStatement":
-				// while文の処理
-				generateWhileStatementCode(n, symboltable, vmwriter)
+				cg.generateWhileStatementCode(n)
 			case "doStatement":
-				// do文の処理
-				generateDoStatementCode(n, symboltable, vmwriter)
+				cg.generateDoStatementCode(n)
 			case "returnStatement":
-				// return文の処理
-				generateReturnStatementCode(n, symboltable, vmwriter)
+				cg.generateReturnStatementCode(n)
 			}
 		}
 	}
 
-	// VMWriterにステートメントのコードを書き込む
-	// vmwriter.WriteStatements(subroutineName, statementSymbolTable)
 }
 
-func generateStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// ステートメントのコード生成処理
-	// ステートメントの処理
+// let文のコード生成処理
+func (cg *CodeGenerator) generateLetStatementCode(node compilationengine.ContainerNode) {
+	// 代入先の変数情報を収集
+	var varName string
+	isArrayAssignment := false
+
+	// 最初のパスで変数名を取得し、必要ならば配列アクセスを処理する
 	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "letStatement":
-				// let文の処理
-				generateLetStatementCode(n, symboltable, vmwriter)
-			case "ifStatement":
-				// if文の処理
-				generateIfStatementCode(n, symboltable, vmwriter)
-			case "whileStatement":
-				// while文の処理
-				generateWhileStatementCode(n, symboltable, vmwriter)
-			case "doStatement":
-				// do文の処理
-				generateDoStatementCode(n, symboltable, vmwriter)
-			case "returnStatement":
-				// return文の処理
-				generateReturnStatementCode(n, symboltable, vmwriter)
+		if parseNode, ok := child.(compilationengine.ParseNode); ok {
+			if parseNode.Type == jacktokenizer.IDENTIFIER {
+				varName = parseNode.Value
+			} else if parseNode.Type == jacktokenizer.SYMBOL && parseNode.Value == "[" {
+				// 配列のインデックスアクセス開始を検出
+				isArrayAssignment = true
+			} else if parseNode.Type == jacktokenizer.SYMBOL && parseNode.Value == "]" {
+				// 配列のベースアドレスをスタックにプッシュ
+				kind := cg.getSegmentName(varName)
+				index := cg.symboltable.IndexOf(cg.subroutineName, varName)
+				cg.vmwriter.WritePush(kind, index)
+				// 配列インデックス式が評価された後
+				cg.vmwriter.WriteArithmetic("add") // ベースアドレス + インデックス
+			}
+		} else if containerNode, ok := child.(compilationengine.ContainerNode); ok && containerNode.Name == "expression" {
+			// 式が見つかる前にすでに配列のアドレス計算が終わっていれば、一時的にスタックに保存
+			if isArrayAssignment {
+				cg.generateExpressionCode(containerNode)
+			} else {
+				// 右辺の式を評価
+				cg.generateExpressionCode(containerNode)
 			}
 		}
 	}
 
-	// VMWriterにステートメントのコードを書き込む
-	// vmwriter.WriteStatement(subroutineName, statementSymbolTable)
+	// 代入の処理
+	if isArrayAssignment {
+		cg.assignToArrayElement()
+	} else {
+		cg.assignToVariable(varName)
+	}
 }
 
-func generateLetStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
+// 配列要素への代入処理
+func (cg *CodeGenerator) assignToArrayElement() {
+	// 配列要素に対する代入処理
+	cg.vmwriter.WritePop("temp", 0)    // 値を一時的に保存
+	cg.vmwriter.WritePop("pointer", 1) // 計算されたアドレスをthatポインタにセット
+	cg.vmwriter.WritePush("temp", 0)   // 値を再度取得
+	cg.vmwriter.WritePop("that", 0)    // 計算されたアドレスに値を格納
+}
 
-	varName := ""
-	isArray := false
+// 通常変数への代入処理
+func (cg *CodeGenerator) assignToVariable(varName string) {
+	// 通常変数への代入処理
+	kind := cg.getSegmentName(varName)
+	index := cg.symboltable.IndexOf(cg.subroutineName, varName)
+	cg.vmwriter.WritePop(kind, index) // 変数に値を格納
+}
+
+// if文のコード生成処理
+func (cg *CodeGenerator) generateIfStatementCode(node compilationengine.ContainerNode) {
+	// ラベル名を生成
+	elseLabel := cg.generateUniqueLabel()
+	ifLabel := cg.generateUniqueLabel()
+
+	hasElse := false
 
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
 			switch n.Name {
 			case "expression":
-				// 式の処理
-				// ここでは式のコード生成処理を呼び出す
-				generateExpressionCode(n, symboltable, vmwriter)
-			}
+				// 条件式の処理
+				cg.generateExpressionCode(n)
 
-		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.IDENTIFIER {
-				// 変数名を取得
-				varName = n.Value
-				// 次のノードが "[" なら配列アクセス
-				// if i+1 < len(node.Children) {
-				// 	if next, ok := node.Children[i+1].(compilationengine.ParseNode); ok && next.Type == jacktokenizer.SYMBOL && next.Value == "[" {
-				// 		isArray = true
-				// 	}
-				// }
-
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ";" {
-
-				if isArray {
-					// 配列の要素に代入する場合
-					vmwriter.WritePop("temp", 0)    // 配列の要素を一時領域にポップ
-					vmwriter.WritePop("pointer", 1) // ポインタ1に配列のベースアドレスをポップ
-					vmwriter.WritePush("temp", 0)   // 一時領域から配列の要素をプッシュ
-					vmwriter.WritePop("that", 0)    // ポインタ1のアドレスに配列の要素を代入
-
-				} else {
-					// 変数のインデックスを取得
-					index := symboltable.IndexOf(subroutineName, varName)
-					// let文の代入処理
-					kind := getKind(subroutineName, varName, symboltable)
-					vmwriter.WritePop(kind, index)
-				}
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "]" {
-				// vmwriter.WritePush("local", 0)  // 配列のベースアドレス
-				kind := getKind(subroutineName, varName, symboltable)
-				index := symboltable.IndexOf(subroutineName, varName)
-				vmwriter.WritePush(kind, index) // 変数の値をプッシュ
-				vmwriter.WriteArithmetic("add") // インデックスを加算
-
-				isArray = true // 配列の要素にアクセスする場合は、isArrayをtrueにする
-			}
-		}
-
-	}
-}
-
-func generateIfStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// if文のコード生成処理
-	// 条件式を取得
-	// condition := node.Name
-	labelCountStr := ""
-	ifLabel := ""
-	elseLabel := ""
-
-	labelCountStr = strconv.Itoa(labelCount)
-	elseLabel = className + "_" + labelCountStr
-	labelCount++
-	labelCountStr = strconv.Itoa(labelCount)
-	ifLabel = className + "_" + labelCountStr
-	labelCount++
-
-	useElse := false
-
-	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "expression":
-				// 式の処理
-				// ここでは式のコード生成処理を呼び出す
-				generateExpressionCode(n, symboltable, vmwriter)
-				vmwriter.WriteArithmetic("not") // 条件式の否定 → goto命令は、条件式がfalseのときに実行されるため、notを使う
-				vmwriter.WriteIf(ifLabel)       // 条件式がtrueの場合に実行される
+				cg.vmwriter.WriteArithmetic("not") // 条件式の否定 → goto命令は、条件式がfalseのときに実行されるため、notを使う
+				cg.vmwriter.WriteIf(ifLabel)       // 条件式がtrueの場合に実行される
 
 			case "statements":
 				// ステートメントの処理
-				generateStatementsCode(n, symboltable, vmwriter)
+				cg.generateStatementsCode(n)
 			}
 		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.IDENTIFIER {
-				// 変数名を取得
-				// varName := n.Value
-				// 変数のインデックスを取得
-				// index := symboltable.IndexOf(subroutineName, varName)
-			} else if n.Type == jacktokenizer.KEYWORD && n.Value == "else" {
+			if n.Type == jacktokenizer.KEYWORD && n.Value == "else" {
 				// else文の処理
 				// VMWriterにelse文のコードを書き込む
-				// vmwriter.WriteGoto(condition)
-				vmwriter.WriteGoto(elseLabel) // 条件式がtrueの場合に実行される
-				vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
-				useElse = true                // else文がある場合は、useElseをtrueにする
-			} else if n.Type == jacktokenizer.KEYWORD && n.Value == "if" {
-				// VMWriterにif文のコードを書き込む
-				// label := fmt.Sprintf("%s.%d", className, labelCount)
-				labelCountStr = strconv.Itoa(labelCount)
+				cg.vmwriter.WriteGoto(elseLabel) // 条件式がtrueの場合に実行される
+				cg.vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
+				hasElse = true                   // else文がある場合は、hasElseをtrueにする
 			}
 		}
 
 	}
 
-	if !useElse {
+	if !hasElse {
 		// else文がない場合は、if文の終了ラベルを書き込む
-		vmwriter.WriteGoto(elseLabel) // else文がない場合は、if文の終了ラベルを書き込む
-		vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
+		cg.vmwriter.WriteGoto(elseLabel) // else文がない場合は、if文の終了ラベルを書き込む
+		cg.vmwriter.WriteLabel(ifLabel)  // 条件式がfalseの場合に実行される
 	}
 
-	vmwriter.WriteLabel(elseLabel) // else文の終了ラベル
+	cg.vmwriter.WriteLabel(elseLabel) // else文の終了ラベル
 }
 
-func generateWhileStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// while文のコード生成処理
-	// 条件式を取得
+// while文のコード生成処理
+func (cg *CodeGenerator) generateWhileStatementCode(node compilationengine.ContainerNode) {
+	// ラベル名を生成
+	whileStartLabel := cg.generateUniqueLabel() // ループの先頭ラベル
+	whileEndLabel := cg.generateUniqueLabel()   // ループの終了ラベル
 
-	whileStart := ""
-	whileEnd := ""
+	// while文の開始ラベルを設定
+	cg.vmwriter.WriteLabel(whileStartLabel)
 
+	// while文の各部分を処理
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
 			switch n.Name {
 			case "expression":
-				// 式の処理
-				// ここでは式のコード生成処理を呼び出す
-				generateExpressionCode(n, symboltable, vmwriter)
-				vmwriter.WriteArithmetic("not") // 条件式の否定 → goto命令は、条件式がfalseのときに実行されるため、notを使う
+				// 条件式を評価
+				cg.generateExpressionCode(n)
+
+				// 条件が偽の場合、ループ終了へジャンプ
+				cg.vmwriter.WriteArithmetic("not") // 条件を反転
+				cg.vmwriter.WriteIf(whileEndLabel) // 条件が偽ならループ終了へ
+
 			case "statements":
-				// ステートメントの処理
-				generateStatementsCode(n, symboltable, vmwriter)
-			}
-		case compilationengine.ParseNode:
-			if n.Type == jacktokenizer.KEYWORD && n.Value == "while" {
-				// while文の開始
-				// label := fmt.Sprintf("%s.%d", className, labelCount)
-				// VMWriterにwhile文の開始のコードを書き込む
-				labelCountStr := strconv.Itoa(labelCount)
-				whileStart = className + "_" + labelCountStr
-				vmwriter.WriteLabel(whileStart)
-				labelCount++
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ")" {
-				// while文の条件式の終了
-				labelCountStr := strconv.Itoa(labelCount)
-				whileEnd = className + "_" + labelCountStr
-				vmwriter.WriteIf(whileEnd)
-				labelCount++
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "}" {
-				// while文の終了
-				// VMWriterにwhile文の終了のコードを書き込む
-				vmwriter.WriteGoto(whileStart)
-				vmwriter.WriteLabel(whileEnd)
+				// ループ本体のステートメントを処理
+				cg.generateStatementsCode(n)
 			}
 		}
 	}
 
+	// ループの先頭へ無条件ジャンプ
+	cg.vmwriter.WriteGoto(whileStartLabel)
+
+	// ループ終了ラベル
+	cg.vmwriter.WriteLabel(whileEndLabel)
 }
 
-func generateDoStatementCode(node compilationengine.ContainerNode, symboltable symboltable.SymbolTable, vmwriter *vmwriter.VMWriter) {
+// do文のコード生成処理
+func (cg *CodeGenerator) generateDoStatementCode(node compilationengine.ContainerNode) {
 
-	doName := ""
-	argNum := 0
-	var objectName string
-	isMethodCall := false
+	// サブルーチン呼び出しの情報を収集
+	callerObject := ""    // 呼び出し元オブジェクト（存在する場合）
+	callName := ""        // 呼び出すサブルーチン名（完全修飾名）
+	argCount := 0         // 引数の数
+	isMethodCall := false // メソッド呼び出しかどうか
 
+	// do文の各部分を処理
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "expressionList":
-				// 引数リストの処理
-				// ここでは引数リストのコード生成処理を呼び出す
-				argNum += generateExpressionListCode(n, symboltable, vmwriter)
+			if n.Name == "expressionList" {
+				// 引数リストを処理して引数の数を取得
+				argCount += cg.generateExpressionListCode(n)
 			}
 		case compilationengine.ParseNode:
 			if n.Type == jacktokenizer.IDENTIFIER {
-
-				if doName == "" {
+				if callName == "" && callerObject == "" {
 					// 最初の識別子はメソッド名またはオブジェクト名として扱う
-					objectName = n.Value
-				}
-				doName += n.Value
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "." {
-				doName += "."
-				isMethodCall = true
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == "(" {
-				if !isMethodCall {
-					vmwriter.WritePush("pointer", 0) // thisをポインタ0にプッシュ
+					callerObject = n.Value
+					callName = n.Value
 				} else {
-					// メソッド呼び出しの場合、オブジェクト名を取得
-					kind := getKind(subroutineName, objectName, symboltable)
-					if kind != "" {
-						index := symboltable.IndexOf(subroutineName, objectName)
-						typeName := symboltable.TypeOf(subroutineName, objectName)
+					// 2つ目以降の識別子はサブルーチン名
+					callName += n.Value
+				}
+			} else if n.Type == jacktokenizer.SYMBOL {
+				switch n.Value {
+				case ".":
+					callName += "."
+					isMethodCall = true
+				case "(":
+					// 引数リストの開始
+					if !isMethodCall {
+						cg.vmwriter.WritePush("pointer", 0) // thisをポインタ0にプッシュ
+					} else {
 
-						idx := strings.LastIndex(doName, ".")
-						if idx != -1 && idx+1 < len(doName) {
-							doName = doName[idx+1:]
-						} else {
-							fmt.Println("区切り文字が見つからないか、ピリオドの後に文字がありません。")
+						// 外部オブジェクトのメソッド呼び出し
+						objectVarName := callerObject
+
+						// メソッド呼び出しの場合、オブジェクト名を取得
+						kind := cg.getSegmentName(objectVarName)
+						if kind != "" {
+							index := cg.symboltable.IndexOf(cg.subroutineName, objectVarName)
+							typeName := cg.symboltable.TypeOf(cg.subroutineName, objectVarName)
+
+							// 呼び出すサブルーチン名からクラス名を取得
+							idx := strings.LastIndex(callName, ".")
+							if idx != -1 && idx+1 < len(callName) {
+								callName = callName[idx+1:]
+							} else {
+								fmt.Println("区切り文字が見つからないか、ピリオドの後に文字がありません。")
+							}
+							callName = typeName + "." + callName
+							cg.vmwriter.WritePush(kind, index)
 						}
-						doName = typeName + "." + doName
-						vmwriter.WritePush(kind, index)
 					}
-				}
-			} else if n.Type == jacktokenizer.SYMBOL && n.Value == ")" {
-				if isMethodCall {
-					// フィールドのメソッド呼び出しの場合、オブジェクト名を取得
-					// kind := getKind(subroutineName, objectName, symboltable)
-					// if kind != "" {
-					// 	index := symboltable.IndexOf(subroutineName, objectName)
-					// 	typeName := symboltable.TypeOf(subroutineName, objectName)
+				case ")":
+					if !isMethodCall {
+						// メソッド呼び出しの場合
+						callName = cg.className + "." + callName
+						argCount++ // thisを引数としてカウント
+					}
 
-					// 	idx := strings.LastIndex(doName, ".")
-					// 	if idx != -1 && idx+1 < len(doName) {
-					// 		doName = doName[idx+1:]
-					// 	} else {
-					// 		fmt.Println("区切り文字が見つからないか、ピリオドの後に文字がありません。")
-					// 	}
-					// 	doName = typeName + "." + doName
-					// 	fmt.Println("doName:", doName)
-					// 	fmt.Println("kind:", kind)
-					// 	vmwriter.WritePush(kind, index)
-					// }
-				} else {
-					// メソッド呼び出しの場合
-					// vmwriter.WritePush("pointer", 0)
-					doName = className + "." + doName
-					argNum++ // thisを引数としてカウント
+					subroutineClassName := strings.Split(callName, ".")[0]
+					callSubroutineName := callName[strings.LastIndex(callName, ".")+1:]
+					if argCount == 0 && cg.subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+						// 引数がない場合は1を設定
+						argCount = 1
+					} else if cg.className != subroutineClassName && cg.subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+						// メソッド呼び出しの場合、thisを引数としてカウント
+						argCount++
+					}
+					callName = strings.ToUpper(string(callName[0])) + callName[1:]
+					cg.vmwriter.WriteCall(callName, argCount)
 				}
-
-				subroutineClassName := strings.Split(doName, ".")[0]
-				callSubroutineName := doName[strings.LastIndex(doName, ".")+1:]
-				// if subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
-				// 	// メソッド呼び出しの場合、thisを引数としてカウント
-				// 	argNum++
-				// }
-				if argNum == 0 && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
-					// 引数がない場合は1を設定
-					argNum = 1
-				} else if className != subroutineClassName && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
-					// メソッド呼び出しの場合、thisを引数としてカウント
-					argNum++
-				}
-				//  else if standardClassCheck(subroutineClassName) {
-				// 	// 標準クラスのメソッド呼び出しの場合、thisを引数としてカウント
-				// 	argNum++
-				// }
-
-				doName = strings.ToUpper(string(doName[0])) + doName[1:]
-				vmwriter.WriteCall(doName, argNum)
 			}
 		}
 	}
-	vmwriter.WritePop("temp", 0)
+	cg.vmwriter.WritePop("temp", 0)
 }
 
-func generateReturnStatementCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-
+// return文のコード生成処理
+func (cg *CodeGenerator) generateReturnStatementCode(node compilationengine.ContainerNode) {
+	// return文が式を含むかどうか調べる
 	hasExpression := false
 
-	// VMWriterにreturn文のコードを書き込む
 	for _, child := range node.Children {
-		switch n := child.(type) {
-		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "expression":
-				// 式の処理
-				// ここでは式のコード生成処理を呼び出す
-				generateExpressionCode(n, symboltable, vmwriter)
-				hasExpression = true
-			}
-
+		if containerNode, ok := child.(compilationengine.ContainerNode); ok && containerNode.Name == "expression" {
+			cg.generateExpressionCode(containerNode)
+			hasExpression = true
+			break // returnは最大1つの式しか持たないので早期脱出
 		}
 	}
+
+	// 式がない場合（void戻り値の関数）は0を返す
+	// Jack言語では全ての関数が値を返す必要がある
 	if !hasExpression {
-		// 式がない場合は0を返す
-		vmwriter.WritePush("constant", 0)
+		cg.vmwriter.WritePush("constant", 0)
 	}
 
-	vmwriter.WriteReturn()
+	cg.vmwriter.WriteReturn()
 }
 
-func generateExpressionListCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) int {
-
-	argNum := 0
-	if len(node.Children) != 0 {
-		argNum++
+// 引数リストのコード生成と引数数のカウント
+func (cg *CodeGenerator) generateExpressionListCode(node compilationengine.ContainerNode) int {
+	// 空の式リストの場合は引数なし
+	if len(node.Children) == 0 {
+		return 0
 	}
-	// 引数リストのコード生成処理
-	// 引数の処理
+
+	// 式の数をカウント（最初の式は確定で1つ）
+	argCount := 1
+
+	// 子ノードを走査して式とカンマを処理
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "expression":
-				// 式の処理
-				// ここでは式のコード生成処理を呼び出す
-				generateExpressionCode(n, symboltable, vmwriter)
+			if n.Name == "expression" {
+				// 式を評価してその結果をスタックに積む
+				cg.generateExpressionCode(n)
 			}
+
 		case compilationengine.ParseNode:
+			// カンマはそれに続く別の式の存在を意味する
 			if n.Type == jacktokenizer.SYMBOL && n.Value == "," {
-				// 引数の区切り
-				argNum++
+				argCount++
 			}
 		}
 	}
 
-	// VMWriterに引数リストのコードを書き込む
-	// vmwriter.WriteExpressionList(subroutineName, expressionListSymbolTable)
-
-	return argNum
+	return argCount
 }
 
-func generateExpressionCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
-	// 式のコード生成処理
-	// 式の処理
-
+// 式のコード生成処理
+func (cg *CodeGenerator) generateExpressionCode(node compilationengine.ContainerNode) {
+	// 演算子とその順序を記録する配列
 	operations := make([]string, 0)
 
+	// 式の各要素を処理
 	for _, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "term":
-				// 項の処理
-				operations = generateTermCode(n, symboltable, vmwriter, operations)
+			if n.Name == "term" {
+				// 項を評価してVM命令を生成し、演算子リストを更新
+				operations = cg.generateTermCode(n, operations)
 			}
 		case compilationengine.ParseNode:
 			if n.Type == jacktokenizer.SYMBOL {
-				// 演算子を取得
-				operator := n.Value
-				operations = append(operations, operator)
-				// VMWriterに演算子のコードを書き込む
+				// 演算子をリストに追加
+				operations = append(operations, n.Value)
 			}
 		}
-
 	}
 
+	// 演算子に基づいてVM命令を生成
 	for _, op := range operations {
 		switch op {
 		case "+":
-			vmwriter.WriteArithmetic("add")
+			cg.vmwriter.WriteArithmetic("add")
 		case "-":
-			vmwriter.WriteArithmetic("sub")
+			cg.vmwriter.WriteArithmetic("sub")
 		case "*":
-			vmwriter.WriteArithmetic("call Math.multiply 2")
+			cg.vmwriter.WriteArithmetic("call Math.multiply 2")
 		case "/":
-			vmwriter.WriteArithmetic("call Math.divide 2")
+			cg.vmwriter.WriteArithmetic("call Math.divide 2")
 		case "&amp;":
-			vmwriter.WriteArithmetic("and")
+			cg.vmwriter.WriteArithmetic("and")
 		case "|":
-			vmwriter.WriteArithmetic("or")
+			cg.vmwriter.WriteArithmetic("or")
 		case "&lt;":
-			vmwriter.WriteArithmetic("lt")
+			cg.vmwriter.WriteArithmetic("lt")
 		case "&gt;":
-			vmwriter.WriteArithmetic("gt")
+			cg.vmwriter.WriteArithmetic("gt")
 		case "=":
-			vmwriter.WriteArithmetic("eq")
+			cg.vmwriter.WriteArithmetic("eq")
 		case "~":
 			// ビット反転演算子の処理
-			vmwriter.WriteArithmetic("not")
+			cg.vmwriter.WriteArithmetic("not")
+		default:
+			fmt.Printf("未対応の演算子: %s\n", op)
 		}
 	}
 
-	// VMWriterに式のコードを書き込む
-	// vmwriter.WriteExpression(subroutineName, expressionSymbolTable)
 }
 
-func generateTermCode(node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter, operations []string) []string {
-	// 項のコード生成処理
-	// 項の処理
-
+// 項のコード生成処理
+func (cg *CodeGenerator) generateTermCode(node compilationengine.ContainerNode, operations []string) []string {
+	// 前処理：必要な状態変数の初期化
 	methodName := ""
 	varName := ""
+
+	// 項の要素を順番に処理
 	for i, child := range node.Children {
 		switch n := child.(type) {
 		case compilationengine.ParseNode:
-			intValue, _ := strconv.Atoi(n.Value)
-			switch n.Type {
-			case jacktokenizer.INT_CONST:
-				// 整数定数の処理
-				vmwriter.WritePush("constant", intValue)
-				if negFlag {
-					// 負の数を処理
-					vmwriter.WriteArithmetic("neg")
-					negFlag = false
-				}
-			case jacktokenizer.STRING_CONST:
-				// 文字列定数の処理
-
-				// 文字列の長さを取得
-				stringLength := len(n.Value)
-				vmwriter.WritePush("constant", stringLength)
-
-				// 文字列をVMWriterに書き込む
-				vmwriter.WriteCall("String.new", 1) // 新しい文字列を作成
-				for _, char := range n.Value {
-					// 各文字をVMWriterに書き込む
-					vmwriter.WritePush("constant", int(char))  // 文字を定数としてプッシュ
-					vmwriter.WriteCall("String.appendChar", 2) // 文字列に文字を追加
-				}
-			case jacktokenizer.KEYWORD:
-				// キーワード定数の処理
-				switch n.Value {
-				case "true":
-					// trueの場合は-1をpush
-					vmwriter.WritePush("constant", 1)
-					vmwriter.WriteArithmetic("neg")
-				case "false":
-					// falseの場合は0をpush
-					vmwriter.WritePush("constant", 0)
-				case "this":
-					// thisの場合はポインタ0をpush
-					vmwriter.WritePush("pointer", 0)
-				case "null":
-					// nullの場合は0をpush
-					vmwriter.WritePush("constant", 0)
-				}
-			case jacktokenizer.IDENTIFIER:
-				// 識別子の処理
-				if i+1 < len(node.Children) {
-					// 次のノードを確認してメソッド呼び出しかどうかを判定
-					if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "(" {
-						// メソッド呼び出しの場合
-						methodName += n.Value
-						generateSubroutineCall(methodName, node, symboltable, vmwriter)
-					} else if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "." {
-						methodName += n.Value + "."
-					} else if nextNode, ok := node.Children[i+1].(compilationengine.ParseNode); ok && nextNode.Type == jacktokenizer.SYMBOL && nextNode.Value == "[" {
-						// 配列のインデックスアクセスの場合
-						varName = n.Value
-
-					}
-				} else {
-					// 通常の変数として処理
-					kind := getKind(subroutineName, n.Value, symboltable)
-					index := getIndex(subroutineName, n.Value, symboltable, isMethodCall)
-					vmwriter.WritePush(kind, index)
-				}
-			case jacktokenizer.SYMBOL:
-
-				switch n.Value {
-				case "-":
-					negFlag = true
-				case "~":
-					// ビット反転演算子の処理
-					operations = append(operations, n.Value)
-				case "]":
-					// 配列のインデックスアクセスの場合
-					kind := getKind(subroutineName, varName, symboltable)
-					index := symboltable.IndexOf(subroutineName, varName)
-					vmwriter.WritePush(kind, index) // 配列のベースアドレス
-					vmwriter.WriteArithmetic("add") // インデックスを加算
-					vmwriter.WritePop("pointer", 1) // that = arr + i
-					vmwriter.WritePush("that", 0)   // arr[i] の値を取得
-				default:
-				}
+			// パースノードの場合はタイプに応じた処理
+			operations = cg.processParseNodeInTerm(n, i, node, methodName, varName, operations)
+			// 識別子の場合は追加情報を収集
+			if n.Type == jacktokenizer.IDENTIFIER {
+				methodName, varName = cg.handleIdentifierInTerm(n, i, node, methodName, varName)
 			}
 		case compilationengine.ContainerNode:
-			switch n.Name {
-			case "expression":
-				// 式の処理
-				generateExpressionCode(n, symboltable, vmwriter)
-			case "expressionList":
-				// 引数リストの処理
-				// generateExpressionListCode(n, symboltable, vmwriter)
-			case "term":
-				// 再帰的に項の処理を呼び出す
-				generateTermCode(n, symboltable, vmwriter, operations)
-			}
+			// コンテナノードの場合はコンテナタイプに応じた処理
+			operations = cg.processContainerNodeInTerm(n, operations)
 		}
 	}
-
-	// VMWriterに項のコードを書き込む
-	// vmwriter.WriteTerm(subroutineName, termSymbolTable)
 
 	return operations
 }
 
-func getIndex(subroutineName string, name string, symboltable symtable.SymbolTable, isMethod bool) int {
-	index := symboltable.IndexOf(subroutineName, name)
-	kind := symboltable.KindOf(subroutineName, name)
+// 項内のパースノード処理
+func (cg *CodeGenerator) processParseNodeInTerm(node compilationengine.ParseNode, index int,
+	parent compilationengine.ContainerNode,
+	methodName string, varName string,
+	operations []string) []string {
+	switch node.Type {
+	case jacktokenizer.INT_CONST:
+		// 整数定数の処理
+		cg.processIntConstant(node.Value)
+	case jacktokenizer.STRING_CONST:
+		// 文字列定数の処理
+		cg.processStringConstant(node.Value)
+	case jacktokenizer.KEYWORD:
+		// キーワードの処理（true, false, this, null）
+		cg.processKeywordConstant(node.Value)
+	case jacktokenizer.SYMBOL:
+		// 記号の処理（-, ~, [, ], など）
+		return cg.processSymbolInTerm(node.Value, varName, operations)
+	}
+
+	return operations
+}
+
+// 項内のコンテナノード処理
+func (cg *CodeGenerator) processContainerNodeInTerm(node compilationengine.ContainerNode, operations []string) []string {
+	switch node.Name {
+	case "expression":
+		// 式の処理
+		cg.generateExpressionCode(node)
+	case "term":
+		// 再帰的に項の処理
+		return cg.generateTermCode(node, operations)
+	}
+
+	return operations
+}
+
+// 整数定数の処理
+func (cg *CodeGenerator) processIntConstant(value string) {
+	intValue, _ := strconv.Atoi(value)
+	cg.vmwriter.WritePush("constant", intValue)
+
+	// 負数フラグがセットされていれば、値を負数に変換
+	if cg.negFlag {
+		cg.vmwriter.WriteArithmetic("neg")
+		cg.negFlag = false
+	}
+}
+
+// 文字列定数の処理
+func (cg *CodeGenerator) processStringConstant(value string) {
+	// 文字列長をプッシュして新しい文字列オブジェクトを作成
+	cg.vmwriter.WritePush("constant", len(value))
+	cg.vmwriter.WriteCall("String.new", 1)
+
+	// 各文字を追加
+	for _, char := range value {
+		cg.vmwriter.WritePush("constant", int(char))
+		cg.vmwriter.WriteCall("String.appendChar", 2)
+	}
+}
+
+// キーワード定数の処理
+func (cg *CodeGenerator) processKeywordConstant(keyword string) {
+	switch keyword {
+	case "true":
+		// true: 1をプッシュして-1に変換（Jack言語の仕様）
+		cg.vmwriter.WritePush("constant", 1)
+		cg.vmwriter.WriteArithmetic("neg")
+	case "false", "null":
+		// false/null: 0をプッシュ
+		cg.vmwriter.WritePush("constant", 0)
+	case "this":
+		// this: 現在のオブジェクト参照（pointer 0）をプッシュ
+		cg.vmwriter.WritePush("pointer", 0)
+	}
+}
+
+// 識別子の処理と情報収集
+func (cg *CodeGenerator) handleIdentifierInTerm(node compilationengine.ParseNode, index int,
+	parent compilationengine.ContainerNode,
+	currentMethodName string, currentVarName string) (string, string) {
+	// 次のノードを確認
+	if index+1 < len(parent.Children) {
+		if nextNode, ok := parent.Children[index+1].(compilationengine.ParseNode); ok {
+			if nextNode.Type == jacktokenizer.SYMBOL {
+				switch nextNode.Value {
+				case "(":
+					// メソッド呼び出しの場合
+					methodName := currentMethodName + node.Value
+					cg.generateSubroutineCall(methodName, parent)
+					return methodName, currentVarName
+				case ".":
+					// クラス名またはオブジェクト名
+					return currentMethodName + node.Value + ".", currentVarName
+				case "[":
+					// 配列アクセスの場合
+					return currentMethodName, node.Value
+				}
+			}
+		}
+	}
+
+	// 単純な変数参照の場合
+	kind := cg.getSegmentName(node.Value)
+	idx := cg.getVarIndex(node.Value, cg.isMethodCall)
+	cg.vmwriter.WritePush(kind, idx)
+
+	return currentMethodName, currentVarName
+}
+
+// 記号の処理
+func (cg *CodeGenerator) processSymbolInTerm(symbol string, varName string, operations []string) []string {
+	switch symbol {
+	case "-":
+		// 単項マイナス演算子
+		cg.negFlag = true
+	case "~":
+		// ビット反転演算子
+		operations = append(operations, symbol)
+	case "]":
+		// 配列アクセス処理
+		cg.processArrayAccess(varName)
+	}
+
+	return operations
+}
+
+// 配列アクセスの処理
+func (cg *CodeGenerator) processArrayAccess(varName string) {
+	// 変数の種類とインデックスを取得
+	kind := cg.getSegmentName(varName)
+	index := cg.symboltable.IndexOf(cg.subroutineName, varName)
+
+	// 配列ベースアドレスをプッシュ
+	cg.vmwriter.WritePush(kind, index)
+
+	// アドレス計算：ベース + インデックス
+	cg.vmwriter.WriteArithmetic("add")
+
+	// 計算したアドレスをポインタにセット
+	cg.vmwriter.WritePop("pointer", 1) // that = arr + i
+
+	// 配列要素の値を取得
+	cg.vmwriter.WritePush("that", 0) // push arr[i]
+}
+
+// 変数のインデックスを取得するヘルパー関数
+func (cg *CodeGenerator) getVarIndex(name string, isMethod bool) int {
+	index := cg.symboltable.IndexOf(cg.subroutineName, name)
+	kind := cg.symboltable.KindOf(cg.subroutineName, name)
 	if kind == "arg" && isMethod {
 		return index + 1 // methodのときはthis分ずらす
 	}
 	return index
 }
 
-func getKind(subroutineName string, name string, symboltable symtable.SymbolTable) string {
-	kind := symboltable.KindOf(subroutineName, name)
+// 変数の種類を取得するヘルパー関数
+func (cg *CodeGenerator) getSegmentName(name string) string {
+	kind := cg.symboltable.KindOf(cg.subroutineName, name)
 	switch kind {
 	case "static":
 		return "static"
@@ -796,19 +746,26 @@ func getKind(subroutineName string, name string, symboltable symtable.SymbolTabl
 	}
 }
 
-func generateSubroutineCall(methodName string, node compilationengine.ContainerNode, symboltable symtable.SymbolTable, vmwriter *vmwriter.VMWriter) {
+// 一意のラベル名を生成
+func (cg *CodeGenerator) generateUniqueLabel() string {
+	label := fmt.Sprintf("%s_%d", cg.className, cg.labelCount)
+	cg.labelCount++
+	return label
+}
+
+func (cg *CodeGenerator) generateSubroutineCall(methodName string, node compilationengine.ContainerNode) {
 	// 引数リストの処理
 	argCount := 0
 	for _, child := range node.Children {
 		if n, ok := child.(compilationengine.ContainerNode); ok && n.Name == "expressionList" {
-			argCount = generateExpressionListCode(n, symboltable, vmwriter)
+			argCount = cg.generateExpressionListCode(n)
 		}
 	}
 
 	subroutineClassName := strings.Split(methodName, ".")[0]
 	subroutineClassName = strings.ToUpper(string(subroutineClassName[0])) + subroutineClassName[1:] // クラス名の最初の文字を大文字に変換
 	callSubroutineName := methodName[strings.LastIndex(methodName, ".")+1:]
-	if argCount == 0 && subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
+	if argCount == 0 && cg.subroutineKindMap[subroutineClassName][callSubroutineName] == "method" {
 		// 引数がない場合は1を設定
 		argCount = 1
 	}
@@ -816,24 +773,11 @@ func generateSubroutineCall(methodName string, node compilationengine.ContainerN
 	// メソッド呼び出しのコードを生成
 	objectName := strings.Split(methodName, ".")[0]
 	methodName = strings.ToUpper(string(methodName[0])) + methodName[1:] // メソッド名の最初の文字を大文字に変換
-	kind := getKind(subroutineName, objectName, symboltable)
+	kind := cg.getSegmentName(objectName)
 	if kind != "" {
-		index := symboltable.IndexOf(subroutineName, objectName)
-		// typeName := symboltable.TypeOf(subroutineName, objectName)
+		index := cg.symboltable.IndexOf(cg.subroutineName, objectName)
 
-		vmwriter.WritePush(kind, index)
+		cg.vmwriter.WritePush(kind, index)
 	}
-	vmwriter.WriteCall(methodName, argCount)
-	// vmwriter.WritePop("local", 0)
-}
-
-func standardClassCheck(className string) bool {
-	// 標準クラスのチェック
-	standardClasses := []string{"Array", "String", "Math", "Output", "Input"}
-	for _, standardClass := range standardClasses {
-		if className == standardClass {
-			return true
-		}
-	}
-	return false
+	cg.vmwriter.WriteCall(methodName, argCount)
 }
